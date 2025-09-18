@@ -38,7 +38,6 @@ The application streamlines event management, improves student engagement, and p
 | Mandeep Singh      | 40289772       | @msingh13        |
 | Yazan Al Lahham    | 40237739       | @555yazan        |
 | Nabil Khan         | 40284257       | @nabnab00        |
-| Derek Saint-jean   | 40286262       | @                |
 | Michael Santella   | 40264501       | @reflexzone13    |
 | Giuseppe Ippolito  | 40315749       | @Ippolito4       |
 | Juliano Di Michele | 40282584       | @JulianoDiMichele|
