@@ -41,8 +41,8 @@ The application streamlines event management, improves student engagement, and p
 | Karim Mellouk      | 40315111       | @KarimDsama      |
 
 ## Languages & Technologies
-- Frontend: React  (TBD if final)  
-- Backend: Node.js (Express) (TBD if final)  
-- Database: PostgreSQL (TBD if final)  
+- Frontend: React   
+- Backend: Node.js (Express)   
+- Database: PostgreSQL   
 - Version Control: GitHub  
 - Agile Tools: GitHub Issues, Projects, and Wiki  
