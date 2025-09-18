@@ -29,16 +29,16 @@ The application streamlines event management, improves student engagement, and p
    - Global analytics and organization management.  
 
 ## Team Members
-| Name               | Student Number | GitHub Username |
-| ------------------ | -------------- | --------------- |
-| Mandeep Singh      | 40289772       | @               |
-| Yazan Al Lahham    | 40237739       | @               |
-| Nabil Khan         | 40284257       | @               |
-| Derek Saint-jean   | 40286262       | @               |
-| Michael Santella   | 40264501       | @               |
-| Giuseppe Ippolito  | 40315749       | @               |
-| Juliano Di Michele | 40282584       | @               |
-| Karim Mellouk      | 40315111       | @               |
+| Name               | Student Number | GitHub Username  |
+| ------------------ | -------------- | ---------------  |
+| Mandeep Singh      | 40289772       | @msingh13        |
+| Yazan Al Lahham    | 40237739       | @555yazan        |
+| Nabil Khan         | 40284257       | @nabnab00        |
+| Derek Saint-jean   | 40286262       | @                |
+| Michael Santella   | 40264501       | @reflexzone13    |
+| Giuseppe Ippolito  | 40315749       | @Ippolito4       |
+| Juliano Di Michele | 40282584       | @JulianoDiMichele|
+| Karim Mellouk      | 40315111       | @KarimDsama      |
 
 ## Languages & Technologies
 - Frontend: React  (TBD if final)  
