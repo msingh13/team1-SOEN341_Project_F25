@@ -28,6 +28,10 @@ The application streamlines event management, improves student engagement, and p
    - Approve organizer accounts and moderate events.  
    - Global analytics and organization management.  
 
+4. **To Be Determined**
+    - TBD
+    - TBD
+
 ## Team Members
 | Name               | Student Number | GitHub Username  |
 | ------------------ | -------------- | ---------------  |
