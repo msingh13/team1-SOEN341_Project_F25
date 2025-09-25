@@ -1,0 +1,82 @@
+# Node.js dependencies
+/node_modules/
+/npm-debug.log
+/yarn-debug.log
+/yarn-error.log
+/package-lock.json
+/yarn.lock
+
+# Build output
+/dist/
+/build/
+/out/
+
+# Logs
+*.log
+logs
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage
+/coverage
+/.nyc_output
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Editor settings
+.vscode/
+.idea/
+*.swp
+
+# OS generated files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.old
+*.orig
+
+# Tests and caches
+/.eslintcache
+/.stylelintcache
+/.parcel-cache
+/.next
+/.nuxt
+/.cache
+/.sass-cache
+/.vuepress/dist
+/.docusaurus
+
+# Python virtualenv (in case of Python scripts/tools)
+/venv/
+/.env/
+
+# Misc
+*.tgz
+*.gz
+*.zip
+*.tar
+
+# Ignore frontend and backend node_modules
+/src/client/node_modules/
+/src/server/node_modules/
+
+/src/client/dist/
+/src/server/dist/
