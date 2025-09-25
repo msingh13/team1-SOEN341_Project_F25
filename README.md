@@ -66,7 +66,7 @@ The application streamlines event management, improves student engagement, and p
 - **Sprint 1 Deliverables**:
   - GitHub repo setup and initialization.  
   - README with description, objectives, features, team info, and tech stack.   
-  - User stories (`US.##`) and tasks (`Task.##`) in GitHub Issues.  
+  - User stories (`US.##`) and tasks (`Task-##`) in GitHub Issues.  
   - Meeting minutes in `/docs/meetings`.  
   - Contribution logs in `/docs/logs`.  
 
