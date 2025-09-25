@@ -1,4 +1,4 @@
-# Contribution Log – Sprint 1 – Mandeep
+# Contribution Log – Sprint 1 – Mandeep Singh
 
 | Date       | Task/Activity          | Time Spent | Notes |
 |------------|------------------------|------------|-------|
