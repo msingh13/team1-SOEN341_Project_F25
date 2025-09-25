@@ -1,4 +1,4 @@
-# Contribution Log – Sprint X – [Full Name]
+# Contribution Log – Sprint 1 – Nabil Khan
 
 | Date       | Task/Activity          | Time Spent | Notes |
 |------------|------------------------|------------|-------|
