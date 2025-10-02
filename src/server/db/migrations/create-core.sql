@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS events (
   location VARCHAR(160),
   capacity INT NOT NULL CHECK (capacity >= 0),
   ticket_type VARCHAR(10) NOT NULL CHECK (ticket_type IN ('free','paid')),
-  status VARCHAR(12) NOT NULL DEFAULT 'draft',
+  status VARCHAR(12) NOT NULL DEFAULT 'published',
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
@@ -47,5 +47,5 @@ CREATE TABLE IF NOT EXISTS saves (
 );
 
 CREATE INDEX IF NOT EXISTS ix_events_start ON events(start_at);
-CREATE INDEX IF NOT EXISTS ix_events_category ON events(category);
 CREATE INDEX IF NOT EXISTS ix_events_org ON events(org_id);
+CREATE INDEX IF NOT EXISTS ix_events_category ON events(category);

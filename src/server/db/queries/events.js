@@ -1,9 +1,9 @@
 const db = require("../index");
 
-// Get all published events
+// list of published events
 exports.getEvents = async (limit = 20, offset = 0) => {
   const sql = `
-    SELECT e.id, e.title, e.start_at, e.location, e.category, o.name as org_name
+    SELECT e.id, e.title, e.start_at, e.location, e.category, o.name AS org_name
     FROM events e
     JOIN organizations o ON o.id = e.org_id
     WHERE e.status = 'published'
@@ -14,11 +14,9 @@ exports.getEvents = async (limit = 20, offset = 0) => {
   return rows;
 };
 
-// Get one event by id
-exports.getEventById = async (id) => {
+exports.countPublished = async () => {
   const { rows } = await db.query(
-    `SELECT * FROM events WHERE id = $1 AND status='published'`,
-    [id]
+    `SELECT COUNT(*)::int AS c FROM events WHERE status='published'`
   );
-  return rows[0];
+  return rows[0].c;
 };
