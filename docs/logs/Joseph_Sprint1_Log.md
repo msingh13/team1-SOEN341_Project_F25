@@ -8,3 +8,9 @@
 | 2025-09-23 | Meeting #2             | 2h         | Discussed Sprint 1 |
 | 2025-09-24 | user stories           | 1h         | write what the user needs|
 | 2025-09-24 | task breakdown         | 1h         | seperate the stories into different task|
+| 2025-09-24 | Meeting #3             | 1h         | seperated tasks evenlly among group memebrs 
+
+### Minor Issues / Challenges
+    - issues setteing up github and switching to new branches.
+    - merging, pulling and pushing. 
+    - never used github, there were some challenges understadming this new platform. 
