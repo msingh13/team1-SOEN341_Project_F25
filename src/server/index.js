@@ -6,6 +6,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+const eventsRouter = require("./routes/events");   // ⬅️ import the router
+app.use("/events", eventsRouter);                  // ⬅️ mount at /events
+
+
 const PORT = process.env.PORT || 3000;
 
 app.get('/health', (_req, res) => {
