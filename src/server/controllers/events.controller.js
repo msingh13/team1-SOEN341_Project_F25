@@ -41,40 +41,70 @@ exports.claimTicket = async (req, res) => {
   }
 };
 
-
-// --- Ticket claim handler ---
-const { claimTicketTx } = require('../db/queries/tickets');
-
 function getUserId(req) {
   const id = req.header('x-user-id');
   return id ? parseInt(id, 10) : null;
 }
 
-exports.claimTicket = async (req, res) => {
+
+// --- Saves (save/unsave/list) ---
+const {
+  saveEvent: dbSaveEvent,
+  unsaveEvent: dbUnsaveEvent,
+  listSavedEventsForUser,
+} = require('../db/queries/saves');
+
+// reuse your existing getUserId(req) helper if it's already defined above.
+// If not present, uncomment this:
+// function getUserId(req) {
+//   const id = req.header('x-user-id');
+//   return id ? parseInt(id, 10) : null;
+// }
+
+// POST /events/:id/save  -> save event for current user
+exports.saveEvent = async (req, res) => {
   try {
     const userId = getUserId(req);
     const eventId = parseInt(req.params.id, 10);
-
     if (!userId || Number.isNaN(eventId)) {
       return res.status(400).json({ code: 'BAD_REQUEST', message: 'Missing user or event id' });
     }
+    const row = await dbSaveEvent(userId, eventId);
+    // 201 on first save, 200 if already existed (idempotent)
+    return res.status(row ? 201 : 200).json({ saved: true, event_id: eventId, user_id: userId });
+  } catch (e) {
+    console.error('saveEvent error', e);
+    return res.status(500).json({ code: 'SERVER_ERROR' });
+  }
+};
 
-    const result = await claimTicketTx(eventId, userId);
-
-    if (result.error) {
-      const { status = 400, code, message } = result.error;
-      return res.status(status).json({ code, message });
+// DELETE /events/:id/save -> remove save for current user
+exports.unsaveEvent = async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const eventId = parseInt(req.params.id, 10);
+    if (!userId || Number.isNaN(eventId)) {
+      return res.status(400).json({ code: 'BAD_REQUEST', message: 'Missing user or event id' });
     }
+    const removed = await dbUnsaveEvent(userId, eventId);
+    return res.status(200).json({ removed, saved: !removed, event_id: eventId, user_id: userId });
+  } catch (e) {
+    console.error('unsaveEvent error', e);
+    return res.status(500).json({ code: 'SERVER_ERROR' });
+  }
+};
 
-    return res.status(201).json({
-      id: result.ticket.id,
-      qr_token: result.ticket.qr_token,
-      created_at: result.ticket.created_at,
-      event_id: eventId,
-      user_id: userId,
-    });
-  } catch (err) {
-    console.error('claimTicket error', err);
-    return res.status(500).json({ code: 'SERVER_ERROR', message: 'Unexpected error' });
+// GET /events/users/:id/saves -> list saved events for a user
+exports.listUserSaves = async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id, 10);
+    if (Number.isNaN(userId)) {
+      return res.status(400).json({ code: 'BAD_REQUEST', message: 'Invalid user id' });
+    }
+    const items = await listSavedEventsForUser(userId);
+    return res.json({ items });
+  } catch (e) {
+    console.error('listUserSaves error', e);
+    return res.status(500).json({ code: 'SERVER_ERROR' });
   }
 };

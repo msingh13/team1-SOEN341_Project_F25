@@ -1,19 +1,26 @@
-import React, { useEffect, useRef } from "react";
-import type { ClaimSuccess } from "../api/claimTicket";
+// src/client/src/components/TicketConfirmationModal.tsx
+import { useEffect, useRef } from "react";
 
 type Props = {
-  open: boolean;
-  data: ClaimSuccess | null;
+  ticketId: number;
+  eventId: number;
+  qrToken: string;
   onClose: () => void;
 };
 
-export default function TicketConfirmationModal({ open, data, onClose }: Props) {
+export default function TicketConfirmationModal({
+  ticketId,
+  eventId,
+  qrToken,
+  onClose,
+}: Props) {
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Close on Escape and move focus into the dialog when it opens
+  // Focus trap lite + Escape to close
   useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
     document.addEventListener("keydown", onKey);
 
     const prev = document.activeElement as HTMLElement | null;
@@ -23,9 +30,7 @@ export default function TicketConfirmationModal({ open, data, onClose }: Props) 
       document.removeEventListener("keydown", onKey);
       prev?.focus?.();
     };
-  }, [open, onClose]);
-
-  if (!open || !data) return null;
+  }, [onClose]);
 
   return (
     // Overlay
@@ -68,19 +73,34 @@ export default function TicketConfirmationModal({ open, data, onClose }: Props) 
         </p>
 
         <div style={{ marginTop: 12, lineHeight: 1.6 }}>
-          <div><strong>Ticket ID:</strong> {data.ticketId}</div>
-          <div><strong>Event ID:</strong> {data.eventId}</div>
-          <div><strong>Seat:</strong> {data.seat ?? "General Admission"}</div>
-          <div><strong>Claimed at:</strong> {new Date(data.claimedAt).toLocaleString()}</div>
+          <div><strong>Ticket ID:</strong> {ticketId}</div>
+          <div><strong>Event ID:</strong> {eventId}</div>
+          <div><strong>QR token:</strong> {qrToken}</div>
         </div>
 
         <div style={{ marginTop: 16, display: "flex", gap: 8 }}>
-          <a href="/me/tickets" style={{ padding: "8px 12px", borderRadius: 12, border: "1px solid #ddd", textDecoration: "none" }}>
+          {/* IMPORTANT: This should NOT trigger claim again. Just navigate or close. */}
+          <a
+            href="/me/tickets"
+            style={{
+              padding: "8px 12px",
+              borderRadius: 12,
+              border: "1px solid #ddd",
+              textDecoration: "none",
+            }}
+          >
             View my tickets
           </a>
           <button
             onClick={onClose}
-            style={{ marginLeft: "auto", padding: "8px 12px", borderRadius: 12, background: "#111", color: "white", border: "none" }}
+            style={{
+              marginLeft: "auto",
+              padding: "8px 12px",
+              borderRadius: 12,
+              background: "#111",
+              color: "white",
+              border: "none",
+            }}
           >
             Close
           </button>

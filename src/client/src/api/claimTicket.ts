@@ -1,41 +1,31 @@
-export type ClaimSuccess = {
-  ticketId: string;
-  eventId: string;
-  claimedAt: string;
-  seat?: string;
+export type ClaimTicketResponse = {
+  ticketId: number;
+  eventId: number;
+  qrToken: string;
 };
 
-export type ClaimErrorReason = "sold_out" | "already_claimed" | "unauthorized";
+export async function claimTicket(eventId: number): Promise<ClaimTicketResponse> {
+  const base = import.meta.env.VITE_API_URL as string;
+  const userId = import.meta.env.VITE_DEMO_USER_ID || "1";
 
-export class ClaimTicketError extends Error {
-  reason: ClaimErrorReason;
-  constructor(reason: ClaimErrorReason, message?: string) {
-    super(message || reason);
-    this.name = "ClaimTicketError";
-    this.reason = reason;
-  }
-}
+  const res = await fetch(`${base}/events/${eventId}/tickets`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-user-id": String(userId),
+    },
+  });
 
-export async function claimTicket(eventId: string): Promise<ClaimSuccess> {
-  // simulate network delay so you see loading
-  await new Promise((r) => setTimeout(r, 600));
+  // surface useful errors
+  const text = await res.text();
+  let data: any = {};
+  try { data = text ? JSON.parse(text) : {}; } catch {}
 
-  // 👇 Trigger different errors by eventId suffix (easy to test)
-  if (eventId.endsWith("_sold")) {
-    throw new ClaimTicketError("sold_out", "Sorry, this event is sold out.");
-  }
-  if (eventId.endsWith("_dup")) {
-    throw new ClaimTicketError("already_claimed", "You already claimed a ticket.");
-  }
-  if (eventId.endsWith("_unauth")) {
-    throw new ClaimTicketError("unauthorized", "You must be signed in.");
+  if (!res.ok) {
+    const code = data?.code || `HTTP_${res.status}`;
+    const message = data?.message || "Unable to claim ticket";
+    throw new Error(`${code}: ${message}`);
   }
 
-  // success
-  return {
-    ticketId: "t_" + Math.random().toString(36).slice(2, 8),
-    eventId,
-    claimedAt: new Date().toISOString(),
-    seat: "GA",
-  };
+  return data as ClaimTicketResponse;
 }
