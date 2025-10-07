@@ -1,15 +1,19 @@
-// src/backend/server.js
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 
+require("./db"); // initialize pool
+const eventsRouter = require("./routes/events");
+
 const app = express();
-app.use(cors());
+app.use(cors({ origin: "http://localhost:5173" }));
 app.use(express.json());
 
-app.get("/", (req, res) => {
-  res.send("Backend is running!");
-});
+app.get("/health", (_req, res) => res.json({ ok: true }));
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
+app.use("/events", eventsRouter);
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`🚀 Server at http://localhost:${PORT}`));
+
+module.exports = app; // for tests
