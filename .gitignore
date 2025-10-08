@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Node.js dependencies
 /node_modules/
 /npm-debug.log
@@ -78,3 +79,6 @@ Desktop.ini
 
 /src/client/dist/
 /src/server/dist/
+=======
+node_modules/
+>>>>>>> 71d3035 (Add .gitignore to ignore node_modules)
