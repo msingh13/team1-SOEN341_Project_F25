@@ -2,6 +2,8 @@ import { useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
+import { Link } from "react-router-dom";
+
 
 function App() {
   const [count, setCount] = useState(0)
@@ -28,6 +30,14 @@ function App() {
       <p className="read-the-docs">
         Click on the Vite and React logos to learn more
       </p>
+
+      {/*Link to Saved Evets Page */}
+      <nav style={{ padding: 10 }}>
+        <Link to="/saved" style={{ fontWeight: 600, color: "lightgreen" }}>
+          → View Saved Events
+        </Link>
+      </nav>
+
     </>
   )
 }
