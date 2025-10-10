@@ -16,6 +16,9 @@ export default function OrganizerApprovalsPage() {
   const [search] = useSearchParams();
   const isAdmin = search.get("dev") === "1"; // DEV ONLY: use ?dev=1 to view      
   const [pending, setPending] = useState<Pending[]>([
+
+    // TEMP MOCK DATA — replace with API call once backend ready
+
     {
       id: 101,
       name: "Avery Chen",
@@ -31,6 +34,16 @@ export default function OrganizerApprovalsPage() {
       submittedAt: new Date().toISOString(),
     },
   ]);
+
+// THIS IS WHAT WE WILL IMPLEMENG LATER WHEN BACKEND IS MADE, BUT FOR NOW USE THE EXAMPLES TO TEST
+// Example (later)
+// useEffect(() => {
+//   fetch("/api/admin/organizers?status=pending")
+//     .then(res => res.json())
+//     .then(data => setPending(data))
+//     .catch(err => console.error(err));
+// }, []);
+
 
   if (!isAdmin) {
   return (
