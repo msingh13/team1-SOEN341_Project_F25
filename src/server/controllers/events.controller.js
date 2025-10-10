@@ -1,6 +1,6 @@
 const Events = require("../db/queries/events");
 const Tickets = require("../db/queries/tickets");
-const { withTransaction } = require("../db/tx");
+const { withTransaction } = require("../db/dbTransaction");
 
 exports.list = async (req, res) => {
   try {
