@@ -1,4 +1,3 @@
-// src/server/db/tx.js
 // Uses your existing pg Pool exported from src/server/db/index.js
 const { pool } = require("./index"); // ⬅️ if your pool is exported elsewhere, adjust this path
 
