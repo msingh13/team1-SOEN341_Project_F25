@@ -17,3 +17,26 @@
 - Faced minor Git setup/config blockers when creating new branch.  
 - Some confusion with old branch deletions, resolved by recreating personal branch.  
 - Some merge conflicts.  
+
+
+---
+
+## STU-4 — Backend and Database Connection Setup  
+**Date:** October 10, 2025  
+**Objective:** Setup Express backend and connect to PostgreSQL database.
+
+### Steps Completed
+1. Installed Express and pg  
+2. Configured PostgreSQL Pool (user: karim, db: campus_events)  
+3. Added routes `/` and `/db-test`  
+4. Verified connection via browser  
+
+### Evidence
+- Screenshot of backend running ✅  
+  ![Backend running](../images/backend_running.png)
+
+- Screenshot of db-test JSON ✅  
+  ![DB test JSON](../images/db_test.png)
+
+### Result
+Backend and DB connection confirmed working. Ready for STU-5.
