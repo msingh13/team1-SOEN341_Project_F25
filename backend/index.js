@@ -7,31 +7,29 @@ const PORT = 3000;
 
 // Configure PostgreSQL connection pool
 const pool = new Pool({
-  user: 'karim',           // Database user
-  host: 'localhost',       // Host (local machine)
+  user: 'karim',            // Database user
+  host: 'localhost',        // Host (local machine)
   database: 'campus_events', // Database name
-  password: '1234',        // Database password
-  port: 5432,              // Default PostgreSQL port
+  password: '1234',         // Database password
+  port: 5432,               // Default PostgreSQL port
 });
 
-// Default route to check if backend is running
+// Middleware to parse JSON
+app.use(express.json());
+
+// ✅ Attach the pool to the app for routes to use it
+app.set('pool', pool);
+
+// ✅ Import event routes (correct path)
+const eventRoutes = require('./routes/event');
+app.use('/events', eventRoutes);
+
+// Default route (for testing)
 app.get('/', (req, res) => {
-  res.send('Backend is running ✅');
+  res.send('<h3>Backend is running ✅</h3>');
 });
 
-// Route to test PostgreSQL connection
-app.get('/db-test', async (req, res) => {
-  try {
-    // Execute a simple query to get current timestamp
-    const result = await pool.query('SELECT NOW()');
-    res.json({ time: result.rows[0] });
-  } catch (err) {
-    console.error(err);
-    res.status(500).send('DB connection error ❌');
-  }
-});
-
-// Start the server
+// Start server
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`✅ Server running on http://localhost:${PORT}`);
 });
