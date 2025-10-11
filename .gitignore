@@ -78,3 +78,5 @@ Desktop.ini
 
 /src/client/dist/
 /src/server/dist/
+
+backend/node_modules/
