@@ -1,26 +1,47 @@
-name: CI (Test Infrastructure Ready)
+# .github/workflows/ci.yml
+name: CI (Test Infra Ready)
 
 on:
   push:
-    branches: [ dev ]
+    branches: [dev, main]
   pull_request:
-    branches: [ dev ]
+    branches: [dev, main]
 
 jobs:
-  build:
+  frontend:
     runs-on: ubuntu-latest
-
+    if: ${{ hashFiles('frontend/package.json') != '' }}
+    defaults:
+      run:
+        working-directory: frontend
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install deps (frontend)
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+      - name: Run placeholder tests (frontend)
+        run: npm run test --if-present || echo "No tests yet — CI linked"
 
-      - name: Install dependencies
-        run: npm install
-
-      - name: Run placeholder tests
-        run: npm test || echo "No tests yet — CI linked successfully"
+  backend:
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('backend/package.json') != '' }}
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+      - name: Install deps (backend)
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+      - name: Run placeholder tests (backend)
+        run: npm run test --if-present || echo "No tests yet — CI linked"
