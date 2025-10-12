@@ -1,5 +1,7 @@
-const db = require('..');
 
+const db = require('..');
+const router = require("express").Router();
+const ctrl = require("../controllers/events.controllers");
 const express = require('express');
 const router = express.Router();
 const eventsCtrl = require('../controllers/events.controllers');
