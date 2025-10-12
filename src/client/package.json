@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
+    "test": "echo \"placeholder\" && exit 0"
   },
   "dependencies": {
     "react": "18.2.0",
