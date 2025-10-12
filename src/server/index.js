@@ -11,7 +11,11 @@ app.use('/api/admin', adminOrganizersRouter);
 
 const PORT = process.env.PORT || 3000;
 
+
+const adminRoutes = require('./routes/admin');  
 const eventsRouter = require('./routes/events');
+
+app.use('/admin', adminRoutes);                  
 app.use('/events', eventsRouter);
 
 app.get('/health', (_req, res) => {
