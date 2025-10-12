@@ -1,24 +1,33 @@
- # Database Indexing & Seeds — US-STU-01 (Browse & Filter Events)
+# Event Indexing Notes (US-STU-01)
 
-## Purpose
-Improve filtering performance for `/events` by adding selective indexes and diverse seed data.
+**Goal:**  
+Improve performance of `/events` browsing and filtering queries.
 
-## Indexes Added
-| Index | Description |
-|-------|--------------|
-| `idx_events_start_at` | Supports range queries and `ORDER BY start_at`. |
-| `idx_events_category` | Speeds up `WHERE category = ?`. |
-| `idx_events_org_id` | Speeds up `WHERE org_id = ?`. |
-| `idx_events_published_start_at` | Partial index for `status='published'`; optimizes public browsing. |
+---
 
-## Verification
-Run:
+### Indexes Added
+| Index | Purpose |
+|--------|----------|
+| `events(start_at)` | Speeds up time-based browsing and sorting |
+| `events(category)` | Optimizes category filter |
+| `events(org_id)` | Optimizes organization filter |
+| `events(start_at) WHERE status='published'` | Partial index for public event listings |
+
+---
+
+### Seeds
+- File: `db/seeds/events_seed.sql`
+- Inserts several sample events across multiple categories and orgs.
+- Run after migrations to test filtering queries.
+
+---
+
+### Verify Index Usage
+Run this query:
 ```sql
-EXPLAIN (ANALYZE, BUFFERS)
-SELECT id, title, start_at
-FROM events
-WHERE status='published'
-  AND start_at BETWEEN now() AND now() + interval '30 days'
+EXPLAIN ANALYZE
+SELECT * FROM events
+WHERE status='published' AND category='tech' AND start_at >= NOW()
 ORDER BY start_at
-LIMIT 20;
+LIMIT 10;
 ```
