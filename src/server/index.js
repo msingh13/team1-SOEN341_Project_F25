@@ -2,29 +2,39 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
+const eventsRouter = require('./routes/events');
+app.use('/events', eventsRouter);
+
+console.log('[server] using src/server/index.js'); 
+
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const adminOrganizersRouter = require('./routes/admin.organizers');
-app.use('/api/admin', adminOrganizersRouter);
 
 const PORT = process.env.PORT || 3000;
 
-
+const adminAnalyticsRouter = require('./routes/admin.analytics.routes');
+const adminOrganizersRouter = require('./routes/admin.organizers');
 const adminRoutes = require('./routes/admin');  
 const eventsRouter = require('./routes/events');
 
 app.use('/admin', adminRoutes);                  
 app.use('/events', eventsRouter);
+app.use('/admin', adminAnalyticsRouter);
+app.use('/api/admin', adminOrganizersRouter);
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true });
 });
 
+app.get('/admin/ping', (_req, res) => res.json({ ok: true, where: 'index' }));
+
+
 app.use((_req, res) => {
   res.status(404).json({ code: 'NOT_FOUND', message: 'Route not found' });
 });
+
 
 app.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT}`);
