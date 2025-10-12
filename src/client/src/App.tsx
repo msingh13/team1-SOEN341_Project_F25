@@ -1,75 +1,68 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
-import ClaimTicketButton from './components/ClaimTicketButton';
+import { useState } from "react";
+import reactLogo from "./assets/react.svg";
+import viteLogo from "/vite.svg";
+import "./App.css";
+import ClaimTicketButton from "./components/ClaimTicketButton";
 import { claimTicket, type ClaimSuccess, ClaimTicketError } from "./api/claimTicket";
 import TicketConfirmationModal from "./components/TicketConfirmationModal";
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from "react-router-dom";
+import EventDetail from "./pages/EventDetail";
 
-
-function App() {
-  const [count, setCount] = useState(0);
+// --- Home Page Component ---
+function Home() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [ticket, setTicket] = useState<ClaimSuccess | null>(null);
+  const navigate = useNavigate(); // ✅ Hook for redirection
 
-  // 1) Define your demo values FIRST
-  const userRole = "student";   // try "guest"
+  // Temporary mock data
+  const userRole = "student";
   const capacity = 100;
-  const claimed = 99;           // set to 100 to see "Sold out"
-  const hasClaimed = false;     // set true to see "Already claimed"
-  //const eventId = "e_demo";     // try "e_demo_sold", "e_demo_dup", "e_demo_unauth"
+  const claimed = 99;
+  const hasClaimed = false;
 
   const isEligible = userRole === "student";
   const soldOut = claimed >= capacity;
 
-  // 2) THEN make UI state that uses them
   const [hasClaimedUI, setHasClaimedUI] = useState(hasClaimed);
   const [soldOutUI, setSoldOutUI] = useState(soldOut);
 
-async function handleClaimClick() {
-  setMessage("");
-  setTicket(null);
-  setLoading(true);
-  try {
-    const data = await claimTicket(eventId);
-    setTicket(data);
-    setHasClaimedUI(true);                 // ⬅️ after success, disable button
-    setMessage("Ticket claimed!");
-  } catch (err) {
-    if (err instanceof ClaimTicketError) {
-      if (err.reason === "sold_out") {
-        setSoldOutUI(true);                // ⬅️ disable as Sold out
-        setMessage("Sold out ❌");
-      } else if (err.reason === "already_claimed") {
-        setHasClaimedUI(true);             // ⬅️ disable as Already claimed
-        setMessage("You already claimed a ticket ❌");
-      } else if (err.reason === "unauthorized") {
-        setMessage("You must be signed in ❌"); // keep enabled so they can try after sign-in
+  // Handle claim ticket logic
+  async function handleClaimClick() {
+    setMessage("");
+    setTicket(null);
+    setLoading(true);
+    try {
+      const data = await claimTicket("e_demo");
+      setTicket(data);
+      setHasClaimedUI(true);
+      setMessage("Ticket claimed!");
+
+      // ✅ Redirect to Event Detail page after success
+      setTimeout(() => {
+        navigate(`/events/${data.eventId}`);
+      }, 1500); // slight delay for UX
+    } catch (err) {
+      if (err instanceof ClaimTicketError) {
+        if (err.reason === "sold_out") {
+          setSoldOutUI(true);
+          setMessage("Sold out ❌");
+        } else if (err.reason === "already_claimed") {
+          setHasClaimedUI(true);
+          setMessage("You already claimed a ticket ❌");
+        } else if (err.reason === "unauthorized") {
+          setMessage("You must be signed in ❌");
+        }
+      } else {
+        setMessage("Something went wrong ❌");
       }
-    } else {
-      setMessage("Something went wrong ❌");
+    } finally {
+      setLoading(false);
     }
-  } finally {
-    setLoading(false);
   }
-}
-
-type Variant = "success" | "sold" | "dup" | "unauth";
-
-const [variant, setVariant] = useState<Variant>("success");
-
-const eventIdMap = {
-  success: "e_demo",
-  sold: "e_demo_sold",
-  dup: "e_demo_dup",
-  unauth: "e_demo_unauth",
-} as const;
-
-const eventId = eventIdMap[variant]; // <-- use this in handleClaimClick
 
   return (
-    <>
+    <div style={{ textAlign: "center" }}>
       <div>
         <a href="https://vite.dev" target="_blank">
           <img src={viteLogo} className="logo" alt="Vite logo" />
@@ -78,19 +71,20 @@ const eventId = eventIdMap[variant]; // <-- use this in handleClaimClick
           <img src={reactLogo} className="logo react" alt="React logo" />
         </a>
       </div>
+
       <h1>Vite + React</h1>
-      <h2>Claim Ticket demo</h2>
+      <h2>Claim Ticket Demo</h2>
+
       <ClaimTicketButton
         isEligible={isEligible}
-        hasClaimed={hasClaimedUI}   // ⬅️ use UI state
-        soldOut={soldOutUI}         // ⬅️ use UI state
+        hasClaimed={hasClaimedUI}
+        soldOut={soldOutUI}
         loading={loading}
         onClick={handleClaimClick}
       />
 
-      
-      {loading && <p style={{ marginTop: 8 }}>⏳ Talking to backend…</p>}
-      {!loading && message && <p role="alert" style={{ marginTop: 8 }}>{message}</p>}
+      {loading && <p>⏳ Talking to backend…</p>}
+      {!loading && message && <p role="alert">{message}</p>}
 
       <TicketConfirmationModal
         open={!!ticket}
@@ -98,32 +92,35 @@ const eventId = eventIdMap[variant]; // <-- use this in handleClaimClick
         onClose={() => setTicket(null)}
       />
 
-
-      {ticket && (
-        <div style={{ marginTop: 12, padding: 12, border: "1px solid #ddd", borderRadius: 12 }}>
-          <strong>Ticket claimed!</strong>
-          <div>Ticket ID: {ticket.ticketId}</div>
-          <div>Event ID: {ticket.eventId}</div>
-          <div>Seat: {ticket.seat ?? "General Admission"}</div>
-          <div>Claimed at: {new Date(ticket.claimedAt).toLocaleString()}</div>
-          <a href="/me/tickets" style={{ display: "inline-block", marginTop: 8 }}>View my tickets</a>
+      {/* Manual navigation button (for testing) */}
+      <div style={{ marginTop: "2rem" }}>
+        <Link
+          to="/events/1"
+          style={{
+            textDecoration: "none",
+            background: "#2563eb",
+            color: "white",
+            padding: "0.5rem 1rem",
+            borderRadius: "8px",
+          }}
+        >
+          View Event Details
+        </Link>
       </div>
-    )}
-      
-      <hr />
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    </div>
+  );
 }
 
-export default App
+// --- Main Router Wrapper ---
+function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/events/:id" element={<EventDetail />} />
+      </Routes>
+    </Router>
+  );
+}
+
+export default App;
