@@ -1,0 +1,110 @@
+[
+  {
+    "id": 1,
+    "title": "Intro to VHDL",
+    "start_at": "2025-10-12T14:00:00Z",
+    "location": "Hall 101",
+    "category": "Workshop",
+    "org_name": "ECE Society",
+    "published": true
+  },
+  {
+    "id": 2,
+    "title": "Anime Night: Ghibli Marathon",
+    "start_at": "2025-10-15T23:00:00Z",
+    "location": "Campus Theatre",
+    "category": "Social",
+    "org_name": "Otaku Anime",
+    "published": true
+  },
+  {
+    "id": 3,
+    "title": "Draft: Unannounced Talk",
+    "start_at": "2025-10-18T16:00:00Z",
+    "location": "EV 2.260",
+    "category": "Lecture",
+    "org_name": "Student Union",
+    "published": false
+  },
+  {
+    "id": 4,
+    "title": "Resume Clinic",
+    "start_at": "2025-10-11T17:00:00Z",
+    "location": "H-820",
+    "category": "Career",
+    "org_name": "CS Society",
+    "published": true
+  },
+  {
+    "id": 5,
+    "title": "Basketball Drop-in",
+    "start_at": "2025-10-10T20:00:00Z",
+    "location": "Gym A",
+    "category": "Sports",
+    "org_name": "Athletics",
+    "published": true
+  },
+  {
+    "id": 6,
+    "title": "Advanced FPGA Workshop",
+    "start_at": "2025-10-20T14:00:00Z",
+    "location": "Hall 201",
+    "category": "Workshop",
+    "org_name": "ECE Society",
+    "published": true
+  },
+  {
+    "id": 7,
+    "title": "Karaoke Night",
+    "start_at": "2025-10-13T01:00:00Z",
+    "location": "Student Lounge",
+    "category": "Social",
+    "org_name": "Otaku Anime",
+    "published": true
+  },
+  {
+    "id": 8,
+    "title": "Web Dev 101",
+    "start_at": "2025-10-09T15:00:00Z",
+    "location": "H-110",
+    "category": "Workshop",
+    "org_name": "CS Society",
+    "published": true
+  },
+  {
+    "id": 9,
+    "title": "Intramural Finals",
+    "start_at": "2025-10-22T18:30:00Z",
+    "location": "Gym B",
+    "category": "Sports",
+    "org_name": "Athletics",
+    "published": true
+  },
+  {
+    "id": 10,
+    "title": "Research Colloquium",
+    "start_at": "2025-10-16T13:00:00Z",
+    "location": "EV 11.455",
+    "category": "Lecture",
+    "org_name": "ECE Society",
+    "published": true
+  },
+  {
+    "id": 11,
+    "title": "Hackathon Kickoff",
+    "start_at": "2025-10-08T12:00:00Z",
+    "location": "Hall Atrium",
+    "category": "Career",
+    "org_name": "CS Society",
+    "published": true
+  },
+  {
+    "id": 12,
+    "title": "DRAFT: Anime Trivia",
+    "start_at": "2025-10-19T20:00:00Z",
+    "location": "Campus Theatre",
+    "category": "Social",
+    "org_name": "Otaku Anime",
+    "published": false
+  }
+]
