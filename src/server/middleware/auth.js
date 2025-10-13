@@ -1,18 +1,26 @@
-// src/server/middleware/auth.js
-// Simple dev auth: pass a user id via header "x-user-id: 1"
-// In real auth, replace this with your session/JWT check.
+import jwt from 'jsonwebtoken';
 
-module.exports = function auth(req, res, next) {
-  const raw = req.header('x-user-id'); // e.g., "1"
-  const id = raw ? parseInt(raw, 10) : NaN;
+export function authenticateToken(req, res, next) {
 
-  if (Number.isInteger(id) && id > 0) {
-    req.user = { id }; // attach user to request
-    return next();
-  }
+const authHeader = req.headers.authorization;
+if(!authHeader) 
+    return res.status(401).json({ message: 'No token provided' });
 
-  return res.status(401).json({
-    code: 'UNAUTHORIZED',
-    message: 'Login required (set x-user-id header during local dev)'
-  });
-};
+const [type, token] = authHeader.split(' ');
+if(type !== 'Bearer' || !token) 
+    return res.status(401).json({ message: 'Invalid token format' });
+
+try{
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    console.log("Token authenticated for user ID:", decoded.id);
+    next();
+    
+
+}catch(err){
+    return res.status(403).json({ message: 'Invalid or expired token' });
+}
+
+
+}
+

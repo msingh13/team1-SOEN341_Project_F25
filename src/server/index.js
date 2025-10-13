@@ -1,6 +1,10 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
+import dotenv from "dotenv";
+dotenv.config();
+import express from 'express';
+import cors from 'cors';
+import pool from './db/index.js';
+import devRoutes from './routes/dev.js';
+import ticketRoutes from './routes/ticketRoute.js';
 
 const eventsRouter = require('./routes/events');
 app.use('/events', eventsRouter);
@@ -8,7 +12,15 @@ app.use('/events', eventsRouter);
 console.log('[server] using src/server/index.js'); 
 
 const app = express();
-app.use(cors());
+
+
+app.use(cors({
+  origin: "http://localhost:5173",                
+  allowedHeaders: ["Content-Type", "Authorization", "X-User-Id"], 
+  credentials: false,                            
+}));
+
+
 app.use(express.json());
 
 
@@ -27,6 +39,22 @@ app.use('/api/admin', adminOrganizersRouter);
 app.get('/health', (_req, res) => {
   res.json({ ok: true });
 });
+
+app.get('/__health/db', async (_req, res) => {// Check database connectivity
+
+  try {
+    
+    const { rows } = await pool.query('SELECT 1 AS ok');
+    res.json({ db: 'up', ok: rows[0].ok === 1 });
+  } catch (e) {
+    res.status(500).json({ db: 'down', error: e.message });
+
+  }
+});
+
+
+app.use('/dev', devRoutes);
+app.use('/', ticketRoutes);
 
 app.get('/admin/ping', (_req, res) => res.json({ ok: true, where: 'index' }));
 
