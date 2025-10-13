@@ -1,7 +1,7 @@
 import { QRCodeCanvas } from "qrcode.react";
 import { useState, useEffect } from "react";
-import { ErrorBoundary } from "./ErrorBoundary";
-import { getUser, isVverified } from "./verify";
+import  {ErrorBoundary}  from "./ErrorBoundary";
+import { getUser, isVerified } from "./verify";
 
 
 type Ticket = {
@@ -13,51 +13,101 @@ type Ticket = {
   qrCode: string;
   status: "claimed" | "checked-in" | "cancelled";
 };
+ type ApiTicket = {
+                  id?: string | number;
+                  status?: string;
+                  qr_code?: string;              
+                  qrCode?: string;             
+                  event_title?: string;
+                  event_location?: string;
+                 event_start_at?: string;
+                 event?: {
+                  id?: string | number;
+                  title?: string;
+                  location?: string;
+                  startAt?: string;
+                  start_at?: string;
+                                  };
+                                };
+
+              function mapApiTicket(t: ApiTicket): Ticket {
+                const ev = t.event ?? {};
+                const startISO = t.event_start_at ?? ev.startAt ?? ev.start_at ?? null;
+                const dt = startISO ? new Date(startISO) : null;
+
+                  return {
+                    id: String(t.id ?? ""),
+                    eventTitle: t.event_title ?? ev.title ?? `Event #${ev.id ?? t.id ?? "?"}`,
+                    date: dt ? dt.toLocaleDateString() : "",
+                    time: dt ? dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
+                    location: t.event_location ?? ev.location ?? "",
+                    qrCode: t.qr_code ?? t.qrCode ?? "",     
+                    status: (t.status as Ticket["status"]) ?? "claimed",
+                  };
+                }
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
+function authHeaders(): Record<string, string> {
+    const header: Record<string, string> = { 'Content-Type': 'application/json' };
+    const token = localStorage.getItem("token");
+    if (token) 
+      header.Authorization = `Bearer ${token}`;
+    return header;
+}
 
 function MyTickets() {
 
-  console.log("User:", getUser(), "Verified:", isVverified());
+  console.log("User:", getUser(), "Verified:", isVerified());
 
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  if (!isVverified()) {
-    return (
-      <main style={{ padding: 24 }}>
-        <h2>403 — Verified students only</h2>
-        <p style={{ opacity: 0.8 }}>
-          This page is visible only to verified students.
-        </p>
-      </main>
-    );
-  }
+  // if (!isVerified()) {
+  //   return (
+  //     <main style={{ padding: 24 }}>
+  //       <h2>403 — Verified students only</h2>
+  //       <p style={{ opacity: 0.8 }}>
+  //         This page is visible only to verified students.
+  //       </p>
+  //     </main>
+  //   );
+  // }
 
     useEffect(() => {
 
         (async() => {
             try {
-                setTickets([
-                    {
-                      id: "ex1",
-                      eventTitle: "example A",
-                      date: "2025-10-15",
-                      time: "19:00",
-                      location: "example X",
-                      qrCode: "QR_CODE_DATA_1",
-                      status: "claimed",
-                    },
-                    {
-                      id: "ex2",
-                      eventTitle: "example B",
-                      date: "2025-11-20",
-                      time: "20:00",
-                      location: "exampleVenue Y",
-                      qrCode: "QR_CODE_DATA_2",
-                      status: "checked-in",
-                        },
-                    ]);
-                    
+              
+              console.log('API_URL =', API_URL);
+              console.log('authHeaders() =', authHeaders());
+
+              const res = await fetch(`${API_URL}/me/tickets`,{
+                method: "GET",
+                headers: authHeaders(),
+              });
+
+              if (!res.ok) {
+                const text = await res.text().catch(()=>"");
+                throw new Error(`Error: ${res.status} ${res.statusText} ${text}`);
+              }
+              const data = await res.json();
+              console.log("Fetched tickets:", data);
+
+              const raw =
+              Array.isArray(data?.tickets) ? data.tickets :
+              Array.isArray(data?.Tickets) ? data.Tickets :
+              Array.isArray(data)          ? data : [];
+
+              console.log("RAW tickets length:", raw.length);
+              console.log("RAW sample[0]:", raw[0]); 
+
+              const mapped: Ticket[] = raw.map(mapApiTicket);
+              console.log("MAPPED tickets length:", mapped.length);
+              console.log("MAPPED sample[0]:", mapped[0]);
+
+              setTickets(mapped);
+
                 } catch {
                     setError("Failed to fetch tickets.");
                 } finally {

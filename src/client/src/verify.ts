@@ -18,7 +18,7 @@ export function getUser(): User | null {
         return null;
      }
 }
-export function isVverified(): boolean {
+export function isVerified(): boolean {
     const user = getUser();
     if (!user?.verified) {
         return false
