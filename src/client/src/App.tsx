@@ -1,8 +1,9 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import viteLogo from "/vite.svg";
-import "./App.css";
-import ClaimTicketButton from "./components/ClaimTicketButton";
+import { useState } from 'react'
+import reactLogo from './assets/react.svg'
+import viteLogo from '/vite.svg'
+import './App.css'
+import { Link } from "react-router-dom";
+import ClaimTicketButton from './components/ClaimTicketButton';
 import { claimTicket, type ClaimSuccess, ClaimTicketError } from "./api/claimTicket";
 import TicketConfirmationModal from "./components/TicketConfirmationModal";
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from "react-router-dom";
