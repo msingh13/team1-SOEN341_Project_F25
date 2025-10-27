@@ -76,3 +76,31 @@ The application streamlines event management, improves student engagement, and p
 - [Design Mockup Fidelity](https://www.webfx.com/blog/web-design/design-mockup-fidelity/)  
 - [Wireframes vs. Prototypes](https://www.webfx.com/blog/web-design/wireframes-vs-prototypes-difference/)  
 - [CampusGroups](https://www.campusgroups.com)  
+
+
+## Event Index Performance Analysis
+
+We added two indexes:
+- `idx_events_org_id` on events(org_id)
+- `idx_events_start_desc` on events(start_at DESC)
+
+### Query plan
+The following query shows an `Index Scan` was used:
+
+### Query plan
+The following query shows an `Index Scan` was used:
+
+```sql
+EXPLAIN ANALYZE
+SELECT * FROM events
+WHERE org_id = 1
+ORDER BY start_at DESC
+LIMIT 10;
+```
+
+![Before index](./docs/images/before_index.png)
+![After index](./docs/images/after_index.png)
+
+
+
+
