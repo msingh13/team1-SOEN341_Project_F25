@@ -1,9 +1,8 @@
-import { Router } from "express";
-import { authenticateToken } from "../middleware/auth.js";
-import { getMyTickets } from "../controllers/ticketsController.js";
+// src/server/routes/ticketRoute.js
+const { Router } = require("express");
+const authenticateToken = require("../middleware/auth"); // your CJS middleware
+const { getMyTickets } = require("../controllers/ticketsController"); // convert controller to CJS too
 
 const router = Router();
-
 router.get("/me/tickets", authenticateToken, getMyTickets);
-
-export default router;
+module.exports = router;

@@ -1,5 +1,3 @@
-import React from 'react'
-
 type Props = {
     isEligible: boolean;    // true if user can claim the ticket
     hasClaimed: boolean;    // true if user has already claimed the ticket
