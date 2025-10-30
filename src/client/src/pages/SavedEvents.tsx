@@ -1,157 +1,62 @@
-// src/pages/SavedEvents.tsx
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { listMySaves } from "../lib/api";
-import { on } from "../lib/bus";
-import SaveButton from "../components/SaveButton";
+import { listSavedEvents, normalizeEventId } from "../lib/api";
+import type {EventItem} from "../lib/api";
 
-type SavedEventWire = {
-  id: number;
-  title: string;
-  description?: string;
-  // backend might send either start_time or startTime — support both
-  start_time?: string;
-  startTime?: string;
-  end_time?: string | null;
-  endTime?: string | null;
-  location?: string;
-};
-
-type EventItem = {
-  id: number;
-  title: string;
-  description?: string;
-  startTime?: string;
-  endTime?: string | null;
-  location?: string;
-};
 
 export default function SavedEvents() {
   const [events, setEvents] = useState<EventItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-
-  async function load() {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await listMySaves();
-      const items: SavedEventWire[] = data.items || [];
-      // normalize keys to camelCase for UI
-      const normalized: EventItem[] = items.map((e) => ({
-        id: e.id,
-        title: e.title,
-        description: e.description,
-        startTime: e.startTime ?? e.start_time,
-        endTime: e.endTime ?? e.end_time,
-        location: e.location,
-      }));
-      setEvents(normalized);
-    } catch (e: any) {
-      setError(e.message || "Failed to load saved events");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    load();
-    const off = on("saves:changed", load);
-    return () => off();
+    (async () => {
+      setLoading(true);
+      try {
+        const items = await listSavedEvents();
+        setEvents(items);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
-  if (loading) return <p style={{ padding: 20 }}>Loading saved events…</p>;
-
-  if (error)
-    return (
-      <div style={{ padding: 20 }}>
-        <p style={{ color: "red" }}>{error}</p>
-        <button onClick={load} style={{ marginTop: 8 }}>Retry</button>
-      </div>
-    );
-
-  if (events.length === 0)
-    return <p style={{ padding: 20 }}>You haven’t saved any events yet.</p>;
+  if (loading) return <main className="container" style={{ paddingTop: 24 }}>Loading…</main>;
 
   return (
-    <div style={{ padding: 20 }}>
-      <h2 style={{ marginBottom: 12 }}>Saved Events</h2>
-
-      <div
-        role="region"
-        aria-label="Saved events"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-          gap: 12,
-          marginTop: 8,
-        }}
-      >
-        {events.map((ev) => (
-          <article
-            key={ev.id}
-            aria-label={ev.title}
-            style={{
-              background: "#141414",
-              border: "1px solid #2b2b2b",
-              borderRadius: 10,
-              padding: 12,
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-            }}
-          >
-            <Link
-              to={`/events/${ev.id}`}
-              style={{
-                textDecoration: "none",
-                color: "inherit",
-                fontWeight: 700,
-                fontSize: 16,
-              }}
-            >
-              {ev.title}
-            </Link>
-
-            <p style={{ fontSize: 13, color: "#9aa", margin: 0 }}>
-              {ev.description || "No description"}
-            </p>
-
-            <div style={{ fontSize: 12, color: "#bbb" }}>
-              <div>
-                <strong>Location:</strong> {ev.location || "N/A"}
-              </div>
-              <div>
-                <strong>Starts:</strong>{" "}
-                {ev.startTime ? new Date(ev.startTime).toLocaleString() : "N/A"}
-              </div>
-            </div>
-
-            <div style={{ marginTop: "auto", display: "flex", gap: 8 }}>
-              <Link
-                to={`/events/${ev.id}`}
-                style={{
-                  padding: "6px 10px",
-                  borderRadius: 8,
-                  border: "1px solid #2b2b2b",
-                  textDecoration: "none",
-                }}
-              >
-                View
-              </Link>
-
-              {/* Reuse your SaveButton to allow quick Unsave and auto-refresh */}
-              <SaveButton
-                eventId={ev.id}
-                onChange={() => {
-                  // optional: re-fetch to reflect any backend-side changes
-                  // but not necessary because SaveButton emits "saves:changed"
-                }}
-              />
-            </div>
-          </article>
-        ))}
+    <main className="container" style={{ paddingTop: 24 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+        <h2>Saved Events</h2>
+        <Link to="/events" className="muted">← Back to Events</Link>
       </div>
-    </div>
+
+      {events.length === 0 ? (
+        <p className="muted">You haven't saved any events yet.</p>
+      ) : (
+        <div className="grid" role="region" aria-live="polite" aria-label="Saved events"
+             style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", marginTop: 8 }}>
+          {events.map((e) => (
+            <article key={e.id} className="event-card" style={{ background: "#1a1a1a", padding: 12, borderRadius: 10, border: "1px solid #2a2a2a" }}>
+              <h3 style={{ margin: 0 }}>
+                <Link to={`/events/${normalizeEventId(e.id)}`} style={{ color: "white", textDecoration: "none" }}>
+                  {e.title}
+                </Link>
+              </h3>
+              <p style={{ marginTop: 6, color: "#bbb" }}>
+                <strong>Date/Time:</strong> {new Date(e.start_time).toLocaleString()}
+              </p>
+              <p style={{ marginTop: 2, color: "#bbb" }}>
+                <strong>Location:</strong> {e.location || "TBA"}
+              </p>
+              <p style={{ marginTop: 2, color: "#888" }}>
+                <strong>Category:</strong> {e.category || "—"} · <strong>Organizer:</strong> {e.organizer || "—"}
+              </p>
+              <div style={{ marginTop: 10 }}>
+                <Link className="btn btn-sm" to={`/events/${normalizeEventId(e.id)}`}>View</Link>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </main>
   );
 }

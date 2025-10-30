@@ -1,67 +1,85 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Routes, Route, Link, useNavigate } from "react-router-dom";
-
 import "./App.css";
 
-import ClaimTicketButton from "./components/ClaimTicketButton";
+//import ClaimTicketButton from "./components/ClaimTicketButton";
 import TicketConfirmationModal from "./components/TicketConfirmationModal";
+
+// type-only imports to satisfy verbatimModuleSyntax
+import type { ClaimSuccess, SavedEventWire, EventItem } from "./lib/api";
 import {
+  listEvents,
+  listSavedEvents,
+  listTickets,
   claimTicket,
-  type ClaimSuccess,
-  ClaimTicketError,
-} from "./api/claimTicket";
+  saveToCalendar,
+} from "./lib/api";
 
-import EventDetail from "./pages/EventDetail";
+import EventsList from "./pages/EventsList";
+import EventDetails from "./pages/EventDetail";
 import OrganizerApprovalsPage from "./pages/admin/OrganizerApprovalsPage";
+import { QRCodeCanvas } from "qrcode.react";
 
-/* ---------- Home (pretty UI) ---------- */
+/* ---------- Home ---------- */
 function Home() {
-  const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState("");
-  const [ticket, setTicket] = useState<ClaimSuccess | null>(null);
   const navigate = useNavigate();
 
-  // demo values
-  const userRole = "student";
-  const capacity = 100;
-  const claimed = 72;
-  const hasClaimed = false;
+  // mini data for the three boxes
+  const [featured, setFeatured] = useState<EventItem[]>([]);
+  const [saved, setSaved] = useState<SavedEventWire[]>([]);
+  const [tickets, setTickets] = useState<ClaimSuccess[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const isEligible = userRole === "student";
-  const soldOut = claimed >= capacity;
+  // claim demo on hero card (optional)
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [ticketModal, setTicketModal] = useState<ClaimSuccess | null>(null);
 
-  const [hasClaimedUI, setHasClaimedUI] = useState(hasClaimed);
-  const [soldOutUI, setSoldOutUI] = useState(soldOut);
-
-  async function handleClaim() {
-    setMsg("");
-    setTicket(null);
-    setLoading(true);
-    try {
-      const data = await claimTicket("e_demo");
-      setTicket(data);
-      setHasClaimedUI(true);
-      setMsg("🎟️ Ticket claimed!");
-      setTimeout(() => navigate(`/events/${data.eventId}`), 1000);
-    } catch (err) {
-      if (err instanceof ClaimTicketError) {
-        if (err.reason === "sold_out") {
-          setSoldOutUI(true);
-          setMsg("❌ Sold out");
-        } else if (err.reason === "already_claimed") {
-          setHasClaimedUI(true);
-          setMsg("❌ You already claimed a ticket");
-        } else if (err.reason === "unauthorized") {
-          setMsg("🔒 You must be signed in");
-        } else {
-          setMsg("❌ Something went wrong");
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const ev = await listEvents({ limit: 50 });
+        const sv = await listSavedEvents();
+        const tk = await listTickets();
+        if (!cancel) {
+          setFeatured(ev.items.slice(0, 6));
+          setSaved(sv.items);
+          setTickets(tk.tickets);
         }
-      } else {
-        setMsg("❌ Something went wrong");
+      } finally {
+        if (!cancel) setLoading(false);
       }
+    })();
+    return () => { cancel = true; };
+  }, []);
+
+  async function onQuickClaim() {
+    // claim the first event as a quick demo
+    if (!featured.length) return;
+    const id = featured[0].id;
+    setBusy(true);
+    setMsg("");
+    try {
+      const t = await claimTicket(id);
+      setTicketModal(t);
+      setMsg("🎟️ Ticket claimed!");
+      // refresh tickets list
+      const tk = await listTickets();
+      setTickets(tk.tickets);
+      setTimeout(() => navigate(`/events/${id}`), 900);
+    } catch (e: any) {
+      setMsg(e?.message || "Failed to claim.");
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
+  }
+
+  async function onSave(id: string) {
+    await saveToCalendar(id);
+    const sv = await listSavedEvents();
+    setSaved(sv.items);
   }
 
   return (
@@ -71,92 +89,117 @@ function Home() {
           <Link to="/" className="brand">🎓 Campus Events</Link>
           <nav className="links">
             <Link to="/">Home</Link>
+            <Link to="/events">Events</Link>
             <Link to="/admin/organizers?dev=1">Admin</Link>
           </nav>
         </div>
       </header>
 
       <main className="container">
+        {/* Hero */}
         <section className="hero">
           <div>
             <h1 className="h1">Find events. Claim tickets. Go.</h1>
-            <p className="muted">
-              Browse by date, category, or organization and store your tickets securely.
-            </p>
+            <p className="muted">Browse by date, category, or organization and store your tickets securely.</p>
           </div>
           <div className="hero-actions">
-            <Link className="btn" to="/events/1">Quick View: Event #1</Link>
-            <Link className="btn btn-ghost" to="/admin/organizers?dev=1">
-              Admin » Organizers
-            </Link>
+            <Link className="btn" to="/events">Browse Events</Link>
+            <button className="btn btn-ghost" onClick={onQuickClaim} disabled={busy || loading}>
+              {busy ? "Claiming…" : "Quick claim first event"}
+            </button>
           </div>
         </section>
 
-        <section className="card">
-          <header className="card-header">
-            <div>
-              <h2 className="h2">Claim Ticket Demo</h2>
-              <p className="muted">
-                Capacity <span className="badge">{claimed}</span> / {capacity}
-              </p>
+        {/* Three-column summary */}
+        <section className="grid3">
+          {/* 1) Featured events */}
+          <article className="mini-card">
+            <div className="mini-header">
+              <h3 className="h3">Events</h3>
+              <Link className="muted" to="/events">View all →</Link>
             </div>
-            <div className="status-wrap">
-              {soldOutUI && <span className="status status-red">Sold Out</span>}
-              {!soldOutUI && hasClaimedUI && (
-                <span className="status status-green">Claimed</span>
-              )}
-              {!soldOutUI && !hasClaimedUI && <span className="status">Available</span>}
-            </div>
-          </header>
-
-          <div className="card-body">
-            <ClaimTicketButton
-              isEligible={isEligible}
-              hasClaimed={hasClaimedUI}
-              soldOut={soldOutUI}
-              loading={loading}
-              onClick={handleClaim}
-            />
-
-            {loading && <p className="info">Talking to backend…</p>}
-            {!loading && msg && (
-              <p className="info" role="alert">{msg}</p>
+            {loading ? (
+              <p className="muted">Loading…</p>
+            ) : featured.length === 0 ? (
+              <p className="muted">No events yet.</p>
+            ) : (
+              <ul className="mini-list">
+                {featured.slice(0, 4).map((e) => (
+                  <li key={e.id}>
+                    <Link to={`/events/${e.id}`}>{e.title}</Link>
+                    <div className="mini-sub">
+                      {new Date(e.start_time).toLocaleString()} · {e.location}
+                    </div>
+                    <div className="mini-cta">
+                      <button className="linklike" onClick={() => onSave(e.id)}>Save</button>
+                      <button className="linklike" onClick={() => navigate(`/events/${e.id}`)}>View</button>
+                    </div>
+                  </li>
+                ))}
+              </ul> 
             )}
+          </article>
 
-            <TicketConfirmationModal
-              open={!!ticket}
-              data={ticket}
-              onClose={() => setTicket(null)}
-            />
-
-            <div className="hint">
-              After claiming, you’ll be redirected to the event detail page.
+          {/* 2) Saved (personal calendar) */}
+          <article className="mini-card">
+            <div className="mini-header">
+              <h3 className="h3">Saved Events</h3>
+              <span className="muted">{saved.length}</span>
             </div>
-          </div>
+            {loading ? (
+              <p className="muted">Loading…</p>
+            ) : saved.length === 0 ? (
+              <p className="muted">Nothing saved yet. Click “Save” on an event.</p>
+            ) : (
+              <ul className="mini-list">
+                {saved.slice(0, 5).map((s) => (
+                  <li key={s.id}>
+                    <Link to={`/events/${s.id}`}>{s.title}</Link>
+                    <div className="mini-sub">
+                      {s.start_time ? new Date(s.start_time).toLocaleString() : "TBA"}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </article>
+
+          {/* 3) Tickets (QR codes) */}
+          <article className="mini-card">
+            <div className="mini-header">
+              <h3 className="h3">My Tickets (QR)</h3>
+              <span className="muted">{tickets.length}</span>
+            </div>
+            {loading ? (
+              <p className="muted">Loading…</p>
+            ) : tickets.length === 0 ? (
+              <p className="muted">No tickets yet. Claim one from an event.</p>
+            ) : (
+              <ul className="qr-grid">
+                {tickets.slice(0, 6).map((t) => (
+                  <li key={t.ticketId} title={`Ticket ${t.ticketId}`}>
+                    <QRCodeCanvas value={t.qr} size={92} includeMargin />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </article>
         </section>
 
-        <section className="grid">
-          <article className="mini-card">
-            <h3 className="h3">Search & Filters</h3>
-            <p className="muted">Filter by date, category, and organization.</p>
-          </article>
-          <article className="mini-card">
-            <h3 className="h3">Save Events</h3>
-            <p className="muted">Bookmark your favorites for later.</p>
-          </article>
-          <article className="mini-card">
-            <h3 className="h3">QR Tickets</h3>
-            <p className="muted">Unique QR for fast check-in.</p>
-          </article>
-        </section>
+        {/* Inline feedback for quick-claim */}
+        {msg && <p className="info" role="alert" style={{ marginTop: 12 }}>{msg}</p>}
+
+        {/* Claim modal */}
+        <TicketConfirmationModal
+          open={!!ticketModal}
+          data={ticketModal}
+          onClose={() => setTicketModal(null)}
+        />
       </main>
 
       <footer className="footer">
         <div className="container footer-inner">
           <span className="muted">© {new Date().getFullYear()} Campus Events — Prototype</span>
-          <a className="muted" href="https://vite.dev" target="_blank" rel="noreferrer">
-            Built with Vite + React
-          </a>
         </div>
       </footer>
     </>
@@ -168,7 +211,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Home />} />
-      <Route path="/events/:id" element={<EventDetail />} />
+      <Route path="/events" element={<EventsList />} />
+      <Route path="/events/:id" element={<EventDetails />} />
       <Route path="/admin/organizers" element={<OrganizerApprovalsPage />} />
       <Route path="*" element={<div className="container">Not Found</div>} />
     </Routes>
