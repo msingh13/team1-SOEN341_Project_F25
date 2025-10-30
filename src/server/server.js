@@ -1,28 +1,67 @@
+// src/server/server.js
 const express = require("express");
 const cors = require("cors");
-const savesRouter = require("./routes/saves.routes");
 require("dotenv").config();
 
-require("./db"); // initialize pool
+const pool = require("./db"); // initialize PostgreSQL pool
+const savesRouter = require("./routes/saves.routes");
 const eventsRouter = require("./routes/events");
-
-const app = express();
-app.use(cors({ origin: "http://localhost:5173" }));
-app.use(express.json());
-app.use("/", savesRouter);
-
-//Added: Import the admin routes module that defines moderation endpoints
 const adminRouter = require("./routes/admin.routes");
 
+// Optional: if you have these routes too, uncomment them
+// const adminAnalyticsRouter = require("./routes/admin.analytics.routes");
+// const adminOrganizersRouter = require("./routes/admin.organizers");
+// const ticketRoutes = require("./routes/ticketRoute.js").default; // if ESM
+// const devRoutes = require("./routes/dev.js").default; // if ESM
+
+const app = express();
+
+// CORS + JSON setup
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    allowedHeaders: ["Content-Type", "Authorization", "X-User-Id"],
+    credentials: false,
+  })
+);
+app.use(express.json());
+
+// --- Health check endpoints ---
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
-app.use("/events", eventsRouter);
+app.get("/__health/db", async (_req, res) => {
+  try {
+    const { rows } = await pool.query("SELECT 1 AS ok");
+    res.json({ db: "up", ok: rows[0].ok === 1 });
+  } catch (e) {
+    res.status(500).json({ db: "down", error: e.message });
+  }
+});
 
-//Added: Mount the admin routes under the '/admin' path prefix
-//Example: POST /admin/events/ :id/publish or /admin/events/ :id/reject
+// --- Routers ---
+app.use("/", savesRouter); // /events/:id/save, /me/saves
+app.use("/events", eventsRouter);
 app.use("/admin", adminRouter);
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Server at http://localhost:${PORT}`));
+// If using extra admin or dev routes later:
+// app.use("/admin", adminAnalyticsRouter);
+// app.use("/api/admin", adminOrganizersRouter);
+// app.use("/dev", devRoutes);
+// app.use("/", ticketRoutes);
 
-module.exports = app; // for tests
+// --- 404 fallback ---
+app.use((_req, res) => {
+  res.status(404).json({ code: "NOT_FOUND", message: "Route not found" });
+});
+
+// --- Start server ---
+const PORT = process.env.PORT || 4000;
+app.listen(PORT, () => console.log(`🚀 Server running at http://localhost:${PORT}`));
+
+// --- DB sanity ping ---
+pool
+  .query("SELECT 1")
+  .then(() => console.log("✅ DB ping OK"))
+  .catch((err) => console.error("❌ DB ping FAILED", err));
+
+module.exports = app;

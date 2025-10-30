@@ -5,11 +5,26 @@ export default function Pagination({ page, limit, total, onPage }) {
 
   return (
     <nav className="pagination" aria-label="Pagination">
-      <button disabled={!canPrev} onClick={() => onPage(page - 1)}>Previous</button>
-      <span aria-live="polite" style={{ padding: '0 8px' }}>
-        Page {page} of {totalPages} — {total ?? 0} results
+      <button
+        className="page-btn"
+        disabled={!canPrev}
+        onClick={() => onPage(page - 1)}
+      >
+        ← Prev
+      </button>
+
+      <span className="page-info" aria-live="polite">
+        Page <strong>{page}</strong> of {totalPages}{" "}
+        <span className="page-results">({total ?? 0} results)</span>
       </span>
-      <button disabled={!canNext} onClick={() => onPage(page + 1)}>Next</button>
+
+      <button
+        className="page-btn"
+        disabled={!canNext}
+        onClick={() => onPage(page + 1)}
+      >
+        Next →
+      </button>
     </nav>
   );
 }

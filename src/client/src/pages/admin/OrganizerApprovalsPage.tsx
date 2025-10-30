@@ -1,8 +1,6 @@
-import React, { useState } from "react";
+// src/pages/admin/OrganizerApprovalsPage.tsx
+import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
-
-
-
 
 type Pending = {
   id: number;
@@ -14,7 +12,11 @@ type Pending = {
 
 export default function OrganizerApprovalsPage() {
   const [search] = useSearchParams();
-  const isAdmin = search.get("dev") === "1"; // DEV ONLY: use ?dev=1 to view      
+
+  // DEV ONLY ACCESS: ?dev=1 OR VITE_ADMIN_BYPASS=1
+  const isAdmin =
+    search.get("dev") === "1" || import.meta.env.VITE_ADMIN_BYPASS === "1";
+
   const [pending, setPending] = useState<Pending[]>([
     {
       id: 101,
@@ -33,26 +35,36 @@ export default function OrganizerApprovalsPage() {
   ]);
 
   if (!isAdmin) {
-  return (
-    <div style={{ padding: 24, color: "#fff", textAlign: "center" }}>
-      <h1 style={{ fontSize: 24, marginBottom: 12 }}>Organizer Approvals</h1>
-      <div style={{ margin: "16px auto", maxWidth: 520, padding: 16, borderRadius: 10, background: "#2a1c1c", border: "1px solid #a43b3b", color: "#ffb5b5" }}>
-        <strong>Access denied</strong>
-        <div style={{ fontSize: 14, opacity: 0.9, marginTop: 6 }}>
-          You must be an administrator to view this page.
+    return (
+      <div style={{ padding: 24, color: "#fff", textAlign: "center" }}>
+        <h1 style={{ fontSize: 24, marginBottom: 12 }}>Organizer Approvals</h1>
+        <div
+          style={{
+            margin: "16px auto",
+            maxWidth: 520,
+            padding: 16,
+            borderRadius: 10,
+            background: "#2a1c1c",
+            border: "1px solid #a43b3b",
+            color: "#ffb5b5",
+          }}
+        >
+          <strong>Access denied</strong>
+          <div style={{ fontSize: 14, opacity: 0.9, marginTop: 6 }}>
+            You must be an administrator to view this page. Try adding{" "}
+            <code>?dev=1</code> to the URL.
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
-
+    );
+  }
 
   const [toast, setToast] = useState<{ type: "success" | "error"; msg: string } | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
 
-  // mock API (replace with real POST later)
-  async function postDecision(id: number, action: "approve" | "reject") {
-    await new Promise((r) => setTimeout(r, 500)); // pretend network
+  // TODO: replace with real POST /admin/organizers/:id/approve|reject
+  async function postDecision(_id: number, _action: "approve" | "reject") {
+    await new Promise((r) => setTimeout(r, 500)); // simulate network
     return { ok: true };
   }
 
@@ -63,7 +75,10 @@ export default function OrganizerApprovalsPage() {
     try {
       const res = await postDecision(row.id, action);
       if (!res.ok) throw new Error("Request failed");
-      setToast({ type: "success", msg: `${action === "approve" ? "Approved" : "Rejected"} ${row.name}` });
+      setToast({
+        type: "success",
+        msg: `${action === "approve" ? "Approved" : "Rejected"} ${row.name}`,
+      });
     } catch (e) {
       // revert on error
       setPending((prev) => [row, ...prev]);
@@ -77,12 +92,14 @@ export default function OrganizerApprovalsPage() {
 
   return (
     <div style={{ padding: 24, color: "#fff" }}>
-      <h1 style={{ fontSize: 24, marginBottom: 12, textAlign: "center" }}>Organizer Approvals</h1>
+      <h1 style={{ fontSize: 24, marginBottom: 12, textAlign: "center" }}>
+        Organizer Approvals
+      </h1>
 
-      {/* Toast */}
       {toast && (
         <div
           role="status"
+          aria-live="polite"
           style={{
             margin: "0 auto 12px",
             maxWidth: 520,
@@ -103,7 +120,7 @@ export default function OrganizerApprovalsPage() {
           background: "#141414",
           borderRadius: 12,
           padding: 16,
-          maxWidth: 520,
+          maxWidth: 620,
           margin: "0 auto",
           boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
         }}
@@ -113,47 +130,66 @@ export default function OrganizerApprovalsPage() {
         </p>
 
         {pending.length === 0 ? (
-          <div style={{ color: "#9aa", textAlign: "center", padding: 16 }}>No pending organizer requests.</div>
+          <div style={{ color: "#9aa", textAlign: "center", padding: 16 }}>
+            No pending organizer requests.
+          </div>
         ) : (
-          pending.map((org) => (
-            <div
-              key={org.id}
-              style={{
-                background: "#1f1f1f",
-                marginBottom: 8,
-                padding: 12,
-                borderRadius: 8,
-                border: "1px solid #2b2b2b",
-              }}
-            >
-              <strong>{org.name}</strong> — {org.email} · {org.organization}
-              <br />
-              <small>Submitted {new Date(org.submittedAt).toLocaleString()}</small>
-              <div style={{ marginTop: 8 }}>
-                <button
-                  onClick={() => onDecision(org, "approve")}
-                  disabled={busyId === org.id}
-                  style={{ marginRight: 8, padding: "6px 12px", borderRadius: 8 }}
-                >
-                  {busyId === org.id ? "Working…" : "Approve"}
-                </button>
-                <button
-                  onClick={() => onDecision(org, "reject")}
-                  disabled={busyId === org.id}
-                  style={{ padding: "6px 12px", borderRadius: 8 }}
-                >
-                  Reject
-                </button>
-              </div>
-            </div>
-          ))
+          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+            {pending.map((org) => (
+              <li
+                key={org.id}
+                style={{
+                  background: "#1f1f1f",
+                  marginBottom: 10,
+                  padding: 12,
+                  borderRadius: 8,
+                  border: "1px solid #2b2b2b",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                  <div>
+                    <strong>{org.name}</strong> — {org.email} · {org.organization}
+                    <br />
+                    <small>
+                      Submitted {new Date(org.submittedAt).toLocaleString()}
+                    </small>
+                  </div>
+                  <div style={{ whiteSpace: "nowrap" }}>
+                    <button
+                      type="button"
+                      onClick={() => onDecision(org, "approve")}
+                      disabled={busyId === org.id}
+                      style={{
+                        marginRight: 8,
+                        padding: "6px 12px",
+                        borderRadius: 8,
+                        cursor: busyId === org.id ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      {busyId === org.id ? "Working…" : "Approve"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDecision(org, "reject")}
+                      disabled={busyId === org.id}
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: 8,
+                        cursor: busyId === org.id ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 
-      
-
       <p style={{ marginTop: 8, textAlign: "center", color: "#778" }}>
-        (UI mocked — we’ll hook real endpoints next)
+        (UI mocked — real endpoints coming next)
       </p>
     </div>
   );
