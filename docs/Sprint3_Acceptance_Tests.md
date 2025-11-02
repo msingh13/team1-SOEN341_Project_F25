@@ -10,3 +10,23 @@
 * **User Story:** As a student, I want to claim a ticket reliably, and the system must handle sold-out or duplicate-claim cases.
 * **Acceptance Test 1 (Sold-Out):** Given "Event X" has 1 ticket left, and I claim it, when "User B" tries to claim it, then "User B" should see a "Sold Out" error.
 * **Acceptance Test 2 (Duplicate):** Given I have already claimed a ticket for "Event Y", when I visit the "Event Y" page again, then the "Claim Ticket" button should be disabled or show "Already Claimed".
+---
+# Sprint 4 Proposed User Stories
+
+## ADM-03-DB: Admin Global Statistics
+* **User Story:** As an admin, I want to see global stats on the platform (total events, total tickets, attendance rates) so I can monitor platform health.
+* **Tasks:**
+    1.  (BE) Create `GET /api/admin/stats` endpoint.
+    2.  (DB) Use `Event.countDocuments()` for total events.
+    3.  (DB) Use `Ticket.countDocuments()` for total tickets.
+    4.  (DB) Use `Ticket.countDocuments({ checkInStatus: true })` for attendance.
+* **Priority:** High
+
+## STU-05-DB: Secure QR Code Generation and Validation
+* **User Story:** As a student, I want a unique QR code for my ticket so I can be checked in at the event.
+* **Tasks:**
+    1.  (DB) Add `qrCodeToken` and `checkInStatus` fields to the `Ticket` schema.
+    2.  (BE) On ticket creation, generate a unique token (`uuid`) and save it.
+    3.  (FE) On the "My Tickets" page, display the token as a QR code (using `react-qr-code`).
+    4.  (BE) Create new `PUT /api/org/validate/:qrCodeToken` endpoint to check-in.
+* **Priority:** High
