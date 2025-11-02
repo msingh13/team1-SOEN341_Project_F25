@@ -1,12 +1,6 @@
 import express from "express";
 import db from "../database.js";
 
-
-
-
-
-
-
 const router = express.Router();
 
 router.get("/admin/analytics", async (req, res) => {
