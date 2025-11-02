@@ -1,66 +1,64 @@
-const express = require("express");
-const router = express.Router();
-const pool = require("../db");
-const authenticateToken = require("../middleware/auth");
-
-// GET /me/events
-router.get("/me/events", authenticateToken, async (req, res) => {
-  const userId = req.user?.id || req.headers["x-user-id"];
-  const page = Math.max(1, parseInt(req.query.page || "1", 10));
-  const perPage = Math.min(20, parseInt(req.query.perPage || "20", 10));
-  const offset = (page - 1) * perPage;
-  const sort = req.query.sort === "start_desc" ? "DESC" : "ASC";
-
-  try {
-    // Check if user is an organizer
-    const orgCheck = await pool.query(
-      `SELECT id FROM organizers WHERE user_id=$1`,
-      [userId]
-    );
-    if (orgCheck.rowCount === 0)
-      return res.status(403).json({ code: "FORBIDDEN", message: "Organizer access only" });
-
-    const organizerId = orgCheck.rows[0].id;
-
-    // Query organizer’s events
-    const { rows: events } = await pool.query(
-      `
-      SELECT 
-        id, title, start_at, location, capacity, 
-        (SELECT COUNT(*) FROM tickets WHERE event_id=e.id AND status='claimed') AS claimed,
-        status
-      FROM events e
-      WHERE e.org_id=$1
-      ORDER BY e.start_at ${sort}
-      LIMIT $2 OFFSET $3
-      `,
-      [organizerId, perPage, offset]
-    );
-
-    const { rows: countRows } = await pool.query(
-      `SELECT COUNT(*)::int AS total FROM events WHERE org_id=$1`,
-      [organizerId]
-    );
-
-    res.json({
-      page,
-      perPage,
-      total: countRows[0].total,
-      totalPages: Math.ceil(countRows[0].total / perPage),
-      data: events.map((e) => ({
-        id: e.id,
-        title: e.title,
-        startAt: e.start_at,
-        location: e.location,
-        capacity: e.capacity,
-        remaining: Math.max(0, e.capacity - e.claimed),
-        status: e.status,
-      })),
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ code: "INTERNAL_ERROR", message: "Failed to load organizer events" });
-  }
-});
-
-module.exports = router;
+// --- Event Analytics for Organizer ---
+router.get("/org/events/:id/analytics", authenticateToken, async (req, res) => {
+    const userId = req.user?.id;
+    const eventId = Number(req.params.id);
+  
+    if (!Number.isFinite(eventId))
+      return res.status(400).json({ code: "BAD_REQUEST", message: "Invalid event ID" });
+  
+    try {
+      // Verify organizer ownership
+      const orgCheck = await pool.query(
+        `SELECT o.id
+           FROM organizers o
+           JOIN events e ON e.org_id = o.id
+          WHERE e.id = $1 AND o.user_id = $2`,
+        [eventId, userId]
+      );
+  
+      if (orgCheck.rowCount === 0)
+        return res.status(403).json({ code: "FORBIDDEN", message: "Not your event" });
+  
+      // Fetch analytics data
+      const { rows } = await pool.query(
+        `
+        SELECT
+          e.id,
+          e.title,
+          e.capacity,
+          COUNT(t.id)::int AS total_tickets,
+          COUNT(t_checked.id)::int AS checked_in,
+          GREATEST(0, e.capacity - COUNT(t.id))::int AS remaining
+        FROM events e
+        LEFT JOIN tickets t ON t.event_id = e.id
+        LEFT JOIN tickets t_checked ON t_checked.event_id = e.id AND t_checked.status = 'checked_in'
+        WHERE e.id = $1
+        GROUP BY e.id, e.title, e.capacity
+        `,
+        [eventId]
+      );
+  
+      if (!rows.length)
+        return res.status(404).json({ code: "NOT_FOUND", message: "Event not found" });
+  
+      const r = rows[0];
+      const attendanceRate =
+        r.total_tickets === 0 ? 0 : Math.round((r.checked_in / r.total_tickets) * 100);
+  
+      res.json({
+        id: r.id,
+        title: r.title,
+        capacity: r.capacity,
+        totalTickets: r.total_tickets,
+        checkedIn: r.checked_in,
+        remaining: r.remaining,
+        attendanceRate,
+      });
+    } catch (err) {
+      console.error("Analytics error:", err);
+      res
+        .status(500)
+        .json({ code: "INTERNAL_ERROR", message: "Failed to load analytics", details: err.message });
+    }
+  });
+  
