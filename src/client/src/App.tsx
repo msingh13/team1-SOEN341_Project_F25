@@ -14,6 +14,7 @@ import {
 import EventDetail from "./pages/EventDetail";
 import OrganizerApprovalsPage from "./pages/admin/OrganizerApprovalsPage";
 import OrganizerEvents  from "./pages/OrganizerEvents";
+import EventAnalytics from "./pages/EventAnalytics";
 
 /* ---------- Home (pretty UI) ---------- */
 function Home() {
@@ -174,6 +175,7 @@ export default function App() {
       <Route path="/events/:id" element={<EventDetail />} />
       <Route path="/admin/organizers" element={<OrganizerApprovalsPage />} />
       <Route path="/organizer/events" element={<OrganizerEvents />} />
+      <Route path="/organizer/events/:id/analytics" element={<EventAnalytics eventId={0} />} />
       <Route path="*" element={<div className="container">Not Found</div>} />
     </Routes>
   );
