@@ -19,3 +19,19 @@ LEFT JOIN tickets t
 WHERE e.id = $1              -- replace with a specific event id
 GROUP BY e.id, e.capacity;
 ```
+### US-ORG-03 Event Analytics Queries
+
+**Total tickets issued per event**
+```sql
+SELECT event_id, COUNT(*) AS total_tickets
+FROM tickets
+GROUP BY event_id;
+
+SELECT 
+    e.id AS event_id,
+    e.capacity,
+    COUNT(t.id) AS issued,
+    (e.capacity - COUNT(t.id)) AS remaining_capacity
+FROM events e
+LEFT JOIN tickets t ON t.event_id = e.id
+GROUP BY e.id, e.capacity;
