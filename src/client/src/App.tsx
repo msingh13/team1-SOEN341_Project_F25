@@ -13,6 +13,7 @@ import {
 
 import EventDetail from "./pages/EventDetail";
 import OrganizerApprovalsPage from "./pages/admin/OrganizerApprovalsPage";
+import OrganizerEvents  from "./pages/OrganizerEvents";
 
 /* ---------- Home (pretty UI) ---------- */
 function Home() {
@@ -72,6 +73,8 @@ function Home() {
           <nav className="links">
             <Link to="/">Home</Link>
             <Link to="/admin/organizers?dev=1">Admin</Link>
+            <Link to="/organizer/events">Organizer Dashboard</Link>
+
           </nav>
         </div>
       </header>
@@ -170,6 +173,7 @@ export default function App() {
       <Route path="/" element={<Home />} />
       <Route path="/events/:id" element={<EventDetail />} />
       <Route path="/admin/organizers" element={<OrganizerApprovalsPage />} />
+      <Route path="/organizer/events" element={<OrganizerEvents />} />
       <Route path="*" element={<div className="container">Not Found</div>} />
     </Routes>
   );
