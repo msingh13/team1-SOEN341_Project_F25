@@ -11,6 +11,7 @@ export default function CreateEvent() {
     location: '',
     capacity: '',
     ticketType: 'free',
+    createdBy: 'yazan', // or dynamic user
   });
 
   const handleChange = (e) => {
@@ -21,7 +22,18 @@ export default function CreateEvent() {
     e.preventDefault();
     try {
       const res = await axios.post('/api/org/events', form);
-      alert('Event created! ID: ' + res.data.id);
+      alert('Event created with ID: ' + res.data.id);
+      setForm({
+        title: '',
+        description: '',
+        date: '',
+        startTime: '',
+        endTime: '',
+        location: '',
+        capacity: '',
+        ticketType: 'free',
+        createdBy: 'yazan',
+      });
     } catch (err) {
       console.error(err);
       alert('Error creating event');
@@ -30,18 +42,19 @@ export default function CreateEvent() {
 
   return (
     <form onSubmit={handleSubmit}>
-      <input name="title" placeholder="Title" onChange={handleChange} required />
-      <input name="description" placeholder="Description" onChange={handleChange} />
-      <input type="date" name="date" onChange={handleChange} required />
-      <input type="time" name="startTime" onChange={handleChange} />
-      <input type="time" name="endTime" onChange={handleChange} />
-      <input name="location" placeholder="Location" onChange={handleChange} />
-      <input type="number" name="capacity" placeholder="Capacity" onChange={handleChange} />
-      <select name="ticketType" onChange={handleChange}>
+      <h2>Create Event</h2>
+      <input name="title" placeholder="Title" value={form.title} onChange={handleChange} required />
+      <input name="description" placeholder="Description" value={form.description} onChange={handleChange} />
+      <input name="date" type="date" value={form.date} onChange={handleChange} required />
+      <input name="startTime" type="time" value={form.startTime} onChange={handleChange} />
+      <input name="endTime" type="time" value={form.endTime} onChange={handleChange} />
+      <input name="location" placeholder="Location" value={form.location} onChange={handleChange} />
+      <input name="capacity" type="number" placeholder="Capacity" value={form.capacity} onChange={handleChange} />
+      <select name="ticketType" value={form.ticketType} onChange={handleChange}>
         <option value="free">Free</option>
         <option value="paid">Paid</option>
       </select>
-      <button type="submit">Create Event</button>
+      <button type="submit">Create</button>
     </form>
   );
 }
