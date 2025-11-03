@@ -8,6 +8,7 @@ const savesRouter = require("./routes/saves.routes");
 const eventsRouter = require("./routes/events");
 const adminRouter = require("./routes/admin.routes");
 const ticketClaimRoutes = require("./routes/events.tickets");
+const organizerRoutes =  require("./routes/organizer.routes");
 const ticketRoute = require("./routes/ticketRoute"); // CJS route
 
 
@@ -46,7 +47,9 @@ app.use("/", savesRouter); // /events/:id/save, /me/saves
 app.use("/events", eventsRouter);
 app.use("/admin", adminRouter);
 app.use("/", ticketClaimRoutes);
+app.use("/", organizerRoutes);
 app.use('/org', ticketRoute);
+
 
 // If using extra admin or dev routes later:
 // app.use("/admin", adminAnalyticsRouter);
