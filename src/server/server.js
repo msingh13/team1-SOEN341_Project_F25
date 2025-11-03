@@ -10,7 +10,7 @@ const adminRouter = require("./routes/admin.routes");
 const ticketClaimRoutes = require("./routes/events.tickets");
 const organizerRoutes =  require("./routes/organizer.routes");
 const ticketRoute = require("./routes/ticketRoute"); // CJS route
-
+const orgEventsRouter = require('./routes/orgEvents');
 
 // Optional: if you have these routes too, uncomment them
 // const adminAnalyticsRouter = require("./routes/admin.analytics.routes");
@@ -49,6 +49,7 @@ app.use("/admin", adminRouter);
 app.use("/", ticketClaimRoutes);
 app.use("/", organizerRoutes);
 app.use('/org', ticketRoute);
+app.use('/api/org/events', orgEventsRouter);  //added
 
 
 // If using extra admin or dev routes later:
