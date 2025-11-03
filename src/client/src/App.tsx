@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Routes, Route, Link, useNavigate } from "react-router-dom";
+import TestScanner from "./pages/Testscanner";
+import ValidateTicket from "./pages/admin/ValidateTicket";
 
 import "./App.css";
 
@@ -171,6 +173,8 @@ export default function App() {
       <Route path="/events/:id" element={<EventDetail />} />
       <Route path="/admin/organizers" element={<OrganizerApprovalsPage />} />
       <Route path="*" element={<div className="container">Not Found</div>} />
+      <Route path="/test-scan" element={<TestScanner />} />
+      <Route path="/admin/validate-ticket" element={<ValidateTicket />} />
     </Routes>
   );
 }
