@@ -22,11 +22,11 @@ function buildWhere({ q, categories, org, dateFrom, dateTo }) {
     params.push(org); i++;
   }
   if (dateFrom) {
-    where.push(`e.start_time::date >= $${i}::date`);
+    where.push(`e.start_at::date >= $${i}::date`);
     params.push(dateFrom); i++;
   }
   if (dateTo) {
-    where.push(`e.start_time::date <= $${i}::date`);
+    where.push(`e.start_at::date <= $${i}::date`);
     params.push(dateTo); i++;
   }
 
@@ -35,10 +35,10 @@ function buildWhere({ q, categories, org, dateFrom, dateTo }) {
 
 function resolveSort(sort) {
   switch (sort) {
-    case 'start_desc':   return 'e.start_time DESC';
+    case 'start_desc':   return 'e.start_at DESC';
     case 'created_desc': return 'e.created_at DESC';
     case 'start_asc':
-    default:             return 'e.start_time ASC';
+    default:             return 'e.start_at ASC';
   }
 }
 
@@ -78,7 +78,7 @@ router.get('/', async (req, res) => {
     // data (compute tickets_claimed lazily)
     const dataSql = `
       SELECT
-        e.id, e.title, e.description, e.start_time, e.end_time,
+        e.id, e.title, e.description, e.start_at, e.end_at,
         e.capacity,
         COALESCE((
           SELECT COUNT(*) FROM tickets t
@@ -122,7 +122,7 @@ router.get('/:id', async (req, res) => {
   try {
     const sql = `
       SELECT
-        e.id, e.title, e.description, e.start_time, e.end_time,
+        e.id, e.title, e.description, e.start_at, e.end_at,
         e.capacity, e.status,
         COALESCE((
           SELECT COUNT(*) FROM tickets t
