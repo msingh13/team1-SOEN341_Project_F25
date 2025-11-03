@@ -7,6 +7,8 @@ const pool = require("./db"); // initialize PostgreSQL pool
 const savesRouter = require("./routes/saves.routes");
 const eventsRouter = require("./routes/events");
 const adminRouter = require("./routes/admin.routes");
+const ticketClaimRoutes = require("./routes/events.tickets");
+
 
 // Optional: if you have these routes too, uncomment them
 // const adminAnalyticsRouter = require("./routes/admin.analytics.routes");
@@ -42,6 +44,7 @@ app.get("/__health/db", async (_req, res) => {
 app.use("/", savesRouter); // /events/:id/save, /me/saves
 app.use("/events", eventsRouter);
 app.use("/admin", adminRouter);
+app.use("/", ticketClaimRoutes);
 
 // If using extra admin or dev routes later:
 // app.use("/admin", adminAnalyticsRouter);

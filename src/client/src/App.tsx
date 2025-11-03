@@ -16,6 +16,9 @@ import {
 import EventDetail from "./pages/EventDetail";
 import OrganizerApprovalsPage from "./pages/admin/OrganizerApprovalsPage";
 
+// @ts-ignore - JSX file in a TS project is fine for now
+import AdminModeration from "./pages/admin/AdminModeration";
+
 /* ---------- Home (pretty UI) ---------- */
 function Home() {
   const [loading, setLoading] = useState(false);
@@ -74,6 +77,7 @@ function Home() {
           <nav className="links">
             <Link to="/">Home</Link>
             <Link to="/admin/organizers?dev=1">Admin</Link>
+            <Link to="/admin/moderation">Moderation</Link>
           </nav>
         </div>
       </header>
@@ -175,6 +179,7 @@ export default function App() {
       <Route path="*" element={<div className="container">Not Found</div>} />
       <Route path="/test-scan" element={<TestScanner />} />
       <Route path="/admin/validate-ticket" element={<ValidateTicket />} />
+      <Route path="/admin/moderation" element={<AdminModeration />} />
     </Routes>
   );
 }
