@@ -9,12 +9,14 @@ const eventsRouter = require("./routes/events");
 const adminRouter = require("./routes/admin.routes");
 const ticketClaimRoutes = require("./routes/events.tickets");
 const organizerRoutes =  require("./routes/organizer.routes");
+const ticketRoute = require("./routes/ticketRoute"); // CJS route
+
 
 // Optional: if you have these routes too, uncomment them
 // const adminAnalyticsRouter = require("./routes/admin.analytics.routes");
 // const adminOrganizersRouter = require("./routes/admin.organizers");
 // const ticketRoutes = require("./routes/ticketRoute.js").default; // if ESM
-// const devRoutes = require("./routes/dev.js").default; // if ESM
+ const devRoutes = require("./routes/dev.js"); // if ESM
 
 const app = express();
 
@@ -46,12 +48,13 @@ app.use("/events", eventsRouter);
 app.use("/admin", adminRouter);
 app.use("/", ticketClaimRoutes);
 app.use("/", organizerRoutes);
+app.use('/org', ticketRoute);
 
 
 // If using extra admin or dev routes later:
 // app.use("/admin", adminAnalyticsRouter);
 // app.use("/api/admin", adminOrganizersRouter);
-// app.use("/dev", devRoutes);
+ app.use("/dev", devRoutes);
 // app.use("/", ticketRoutes);
 
 // --- 404 fallback ---
