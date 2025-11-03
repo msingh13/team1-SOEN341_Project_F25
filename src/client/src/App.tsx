@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Routes, Route, Link, useNavigate } from "react-router-dom";
+import TestScanner from "./pages/Testscanner";
+import ValidateTicket from "./pages/admin/ValidateTicket";
 
 import "./App.css";
 
@@ -13,6 +15,10 @@ import {
 
 import EventDetail from "./pages/EventDetail";
 import OrganizerApprovalsPage from "./pages/admin/OrganizerApprovalsPage";
+import OrganizerEvents  from "./pages/OrganizerEvents";
+
+// @ts-ignore - JSX file in a TS project is fine for now
+import AdminModeration from "./pages/admin/AdminModeration";
 
 /* ---------- Home (pretty UI) ---------- */
 function Home() {
@@ -72,6 +78,8 @@ function Home() {
           <nav className="links">
             <Link to="/">Home</Link>
             <Link to="/admin/organizers?dev=1">Admin</Link>
+            <Link to="/organizer/events">Organizer Dashboard</Link>
+            <Link to="/admin/moderation">Moderation</Link>
           </nav>
         </div>
       </header>
@@ -170,7 +178,11 @@ export default function App() {
       <Route path="/" element={<Home />} />
       <Route path="/events/:id" element={<EventDetail />} />
       <Route path="/admin/organizers" element={<OrganizerApprovalsPage />} />
+      <Route path="/organizer/events" element={<OrganizerEvents />} />
       <Route path="*" element={<div className="container">Not Found</div>} />
+      <Route path="/test-scan" element={<TestScanner />} />
+      <Route path="/admin/validate-ticket" element={<ValidateTicket />} />
+      <Route path="/admin/moderation" element={<AdminModeration />} />
     </Routes>
   );
 }
