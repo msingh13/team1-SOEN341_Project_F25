@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useAuth } from "../../auth/AuthContext";
 import {
   listOrgs, createOrg, updateOrg, deleteOrg,
   assignRole, removeRole, type Org, type Role
@@ -7,24 +7,13 @@ import {
 
 type Toast = { type: "success" | "error"; msg: string } | null;
 
-function Guard({ children }: { children: React.ReactNode }) {
-  const [sp] = useSearchParams();
-  const isAdmin = sp.get("dev") === "1" || import.meta.env.VITE_ADMIN_BYPASS === "1";
-  if (!isAdmin) {
-    return (
-      <div className="container" style={{ padding: 24 }}>
-        <h1 className="h2">Organizations</h1>
-        <div className="card" style={{ background: "#2a1c1c", border: "1px solid #a43b3b", color: "#ffb5b5" }}>
-          <b>Access denied</b>
-          <div className="muted">Administrators only. (Dev tip: add <code>?dev=1</code> to the URL.)</div>
-        </div>
-      </div>
-    );
-  }
-  return <>{children}</>;
-}
+
 
 export default function OrganizationsPage() {
+  const { hasRole } = useAuth();
+  const isAdmin = hasRole("admin");
+  if (!isAdmin) return null; 
+
   const [orgs, setOrgs] = useState<Org[] | null>(null);
   const [query, setQuery] = useState("");
   const [toast, setToast] = useState<Toast>(null);
@@ -122,7 +111,6 @@ export default function OrganizationsPage() {
   const list = filtered(orgs);
 
   return (
-    <Guard>
       <div className="container" style={{ padding: 24 }}>
         <header className="card-header" style={{ marginBottom: 12 }}>
           <div>
@@ -257,11 +245,10 @@ export default function OrganizationsPage() {
           </dialog>
         )}
       </div>
-    </Guard>
   );
 }
 
-function AssignForm({ orgId, onAssign }: { orgId: number; onAssign: (userId: number, role: Role) => void | Promise<void> }) {
+function AssignForm({  onAssign }: { orgId: number; onAssign: (userId: number, role: Role) => void | Promise<void> }) {
   const [userId, setUserId] = useState<string>("");
   const [role, setRole] = useState<Role>("member");
   return (
