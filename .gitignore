@@ -114,3 +114,8 @@ Desktop.ini
 # ================================
 .env
 .env.local
+
+
+.vite/deps 
+.vite/*
+client/client/node_modules/
