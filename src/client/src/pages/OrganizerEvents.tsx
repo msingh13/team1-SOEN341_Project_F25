@@ -22,11 +22,10 @@ export default function OrganizerEvents() {
     async function fetchEvents() {
       setLoading(true);
       try {
-        const token = localStorage.getItem("token");
         const res = await fetch(
-          `${API_URL}/org/events?page=${page}&limit=10&sort=${sort}`,
-          { headers: token ? { Authorization: `Bearer ${token}` } : {} }
-        );
+             `${API_URL}/org/events?page=${page}&limit=10&sort=${sort}`,
+             { headers: { "Authorization": `Bearer ${localStorage.getItem("token") || ""}` } }
+          );
         const json = await res.json();
         setEvents(json.data || []);
         setTotalPages(json.totalPages || 1);

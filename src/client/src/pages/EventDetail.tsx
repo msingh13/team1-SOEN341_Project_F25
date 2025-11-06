@@ -136,25 +136,27 @@ async function handleClaim() {
 
   const soldOut = event.remaining_seats <= 0;
 
-  function downloadIcs(ev: EventData) {
-    const dt = (iso: string) =>
-      new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
-    const ics = [
-      'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Campus Events//EN','BEGIN:VEVENT',
-      `UID:event-${ev.id}@campus`,
-      `DTSTAMP:${dt(new Date().toISOString())}`,
-      `DTSTART:${dt(ev.start_time)}`,
-      ev.end_time ? `DTEND:${dt(ev.end_time)}` : null,
+  function downloadIcs(ev: {title:string; start_time:string; end_time?:string; location?:string}) {
+    const lines = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Campus Events//EN",
+      "BEGIN:VEVENT",
+      `UID:${ev.title}-${ev.start_time}`,
+      `DTSTAMP:${new Date().toISOString().replace(/[-:]/g,"").split(".")[0]}Z`,
+      `DTSTART:${ev.start_time.replace(/[-:]/g,"").split(".")[0]}Z`,
+      ev.end_time ? `DTEND:${ev.end_time.replace(/[-:]/g,"").split(".")[0]}Z` : "",
       `SUMMARY:${ev.title}`,
-      ev.location ? `LOCATION:${ev.location}` : null,
-      ev.description ? `DESCRIPTION:${ev.description.replace(/\n/g,'\\n')}` : null,
-      'END:VEVENT','END:VCALENDAR'
-    ].filter(Boolean).join('\r\n');
-    const blob = new Blob([ics], { type: 'text/calendar' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `event_${ev.id}.ics`; a.click();
-    URL.revokeObjectURL(url);
+      ev.location ? `LOCATION:${ev.location}` : "",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].filter(Boolean).join("\r\n");
+    const blob = new Blob([lines], { type: "text/calendar;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${ev.title}.ics`;
+    a.click();
+    URL.revokeObjectURL(a.href);
   }
   
 
@@ -197,7 +199,7 @@ async function handleClaim() {
         <div style={{ marginTop: 16, display: "flex", gap: 12, alignItems: "center" }}>
           {/* Save button (your reusable component) */}
           <SaveButton eventId={event.id} onChange={() => { /* optional */ }} />
-          <button className="btn" onClick={() => downloadIcs(event)}>Add to Calendar</button>
+          <button className="btn btn-ghost" onClick={() => downloadIcs(event)}>Add to Calendar</button>
 
           {/* Claim button (students only) */}
           {isStudent && (

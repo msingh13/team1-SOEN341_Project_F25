@@ -1,71 +1,58 @@
-import { useState, useEffect, useRef } from "react";
-
-const API = import.meta.env.VITE_API_URL || "http://localhost:4000";
+import { useState } from "react";
 
 export default function QRValidate() {
+  const API = import.meta.env.VITE_API_URL || "http://localhost:4000";
   const [token, setToken] = useState("");
   const [result, setResult] = useState<any>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const [loading, setLoading] = useState(false);
 
-  // Optional: use native BarcodeDetector if available (Chrome)
-  useEffect(() => {
-    let stop = false;
-    (async () => {
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
-      if (!('BarcodeDetector' in window)) return;
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
-      const detector = new BarcodeDetector({ formats: ['qr_code'] });
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      const v = videoRef.current!;
-      v.srcObject = stream; await v.play();
-      async function tick() {
-        if (stop) return;
-        try {
-          const codes = await detector.detect(v);
-          if (codes?.[0]?.rawValue) {
-            setToken(codes[0].rawValue);
-          }
-        } catch {}
-        requestAnimationFrame(tick);
-      }
-      tick();
-    })();
-    return () => { stop = true; videoRef.current?.srcObject && (videoRef.current.srcObject as MediaStream).getTracks().forEach(t=>t.stop()); };
-  }, []);
-
-  async function validate(tok: string) {
-    setErr(null); setResult(null);
+  async function onValidate(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setResult(null);
     try {
       const res = await fetch(`${API}/tickets/validate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('token')}` },
-        body: JSON.stringify({ token: tok.trim() }),
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("token") || ""}`,
+        },
+        body: JSON.stringify({ token: token.trim() }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.message || 'Validation failed');
-      setResult(data);
-    } catch (e:any) { setErr(e.message); }
+      setResult({ ok: res.ok, data });
+    } catch (err) {
+      setResult({ ok: false, data: { message: "Network error" } });
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
-    <div className="container" style={{ padding: 24 }}>
-      <h1 className="h2">Validate Ticket</h1>
-      <div className="card" style={{ padding: 12, display: 'grid', gap: 8 }}>
-        <input value={token} onChange={(e)=>setToken(e.target.value)} placeholder="Paste QR token…" />
-        <button className="btn" onClick={()=>validate(token)} disabled={!token.trim()}>Validate</button>
-        <video ref={videoRef} playsInline muted style={{ width: '100%', borderRadius: 8, border: '1px solid #333' }} />
-      </div>
-      {err && <p style={{ color: '#ffb5b5' }}>{err}</p>}
+    <div className="container" style={{ padding: 20 }}>
+      <h2>QR / Ticket Validation</h2>
+      <form onSubmit={onValidate} style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <input
+          value={token}
+          onChange={e=>setToken(e.target.value)}
+          placeholder="Paste QR token here"
+          style={{ flex: 1 }}
+        />
+        <button className="btn" disabled={loading || !token.trim()}>
+          {loading ? "Checking…" : "Validate"}
+        </button>
+      </form>
       {result && (
-        <div className="card" style={{ marginTop: 12, padding: 12 }}>
-          <b>Checked in!</b>
-          <div>Ticket #{result.ticketId}</div>
-          <div>Event #{result.eventId}</div>
-          <div>User #{result.userId}</div>
-          <div>When: {new Date(result.checkedInAt).toLocaleString()}</div>
+        <div style={{ marginTop: 12 }}>
+          {result.ok ? (
+            <div className="card" style={{ background: "#103d25", border: "1px solid #1f8a4c", color: "#b5ffd4", padding: 12 }}>
+              ✅ Checked in — Ticket #{result.data.ticketId}
+            </div>
+          ) : (
+            <div className="card" style={{ background: "#3d1010", border: "1px solid #a43b3b", color: "#ffb5b5", padding: 12 }}>
+              ❌ {result.data?.message || "Invalid"}
+            </div>
+          )}
         </div>
       )}
     </div>

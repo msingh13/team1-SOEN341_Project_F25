@@ -12,9 +12,12 @@ const requireAdmin = require("../middleware/requireAdmin");
 
 // Controllers
 const moderation = require("../controllers/moderation.controller");
+const adminDash = require("../controllers/admin.dashboard");
 
 // Protect all admin endpoints
 router.use(authenticateToken, requireAdmin);
+router.get("/events/submitted", adminDash.listSubmitted);
+router.get("/stats", adminDash.globalStats);
 
 // POST /admin/events/:id/publish → publish a submitted event
 router.post("/events/:id/publish", moderation.publishEvent);

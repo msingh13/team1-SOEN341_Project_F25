@@ -29,27 +29,19 @@ export default function AdminModeration() {
 
   // seed some fake submitted events on first load
   useEffect(() => {
-    setEvents([
-      {
-        id: 101,
-        title: "Robotics Club Demo",
-        description: "Weekly showcase of projects.",
-        category: "Tech",
-        organizer: "Engineering Society",
-        start_at: new Date(Date.now() + 86400000).toISOString(), // +1 day
-        status: "submitted",
-      },
-      {
-        id: 102,
-        title: "Career Night",
-        description: "Meet recruiters and alumni.",
-        category: "Career",
-        organizer: "Career Services",
-        start_at: new Date(Date.now() + 2 * 86400000).toISOString(),
-        status: "submitted",
-      },
-    ]);
-  }, []);
+      (async () => {
+         try {
+           const API = import.meta.env.VITE_API_URL || "http://localhost:4000";
+           const res = await fetch(`${API}/admin/events/submitted`, {
+             headers: { Authorization: `Bearer ${localStorage.getItem("token") ?? ""}` }
+           });
+           const list = await res.json();
+           setEvents(list);
+         } catch (e) {
+           setError("Failed to load submitted events");
+         }
+       })();
+     }, []);
 
   function onChangeReason(id: number, val: string) {
     setReasons((prev) => ({ ...prev, [id]: val }));
@@ -60,13 +52,17 @@ export default function AdminModeration() {
     setBusyId(id);
     setError(null);
     try {
-      // pretend round-trip
-      await new Promise((r) => setTimeout(r, 400));
-      setEvents((prev) =>
-        prev.map((e) => (e.id === id ? { ...e, status: "published" as const } : e))
-      );
+     await new Promise((r) => setTimeout(r, 400));
+     setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, status: "published" } : e)));
+     const API = import.meta.env.VITE_API_URL || "http://localhost:4000";
+     const res = await fetch(`${API}/admin/events/${id}/publish`, {
+       method: "POST",
+       headers: { "Authorization": `Bearer ${localStorage.getItem("token") ?? ""}` }
+     });
+     if (!res.ok) throw new Error("Publish failed");
+     setEvents((prev) => prev.filter((e) => e.id !== id));
     } catch {
-      setError("Failed to publish (mock).");
+      setError("Failed to publish.");
     } finally {
       setBusyId(null);
     }
@@ -75,27 +71,30 @@ export default function AdminModeration() {
   // “Reject” — requires a reason; purely local update
   async function onReject(id: number) {
     const reason = (reasons[id] || "").trim();
-    if (!reason) {
-      alert("Please provide a rejection reason.");
-      return;
-    }
+    if (!reason) { alert("Please provide a rejection reason."); return; }
     setBusyId(id);
     setError(null);
     try {
-      await new Promise((r) => setTimeout(r, 400));
-      setEvents((prev) =>
-        prev.map((e) =>
-          e.id === id
-            ? { ...e, status: "rejected" as const, reject_reason: reason }
-            : e
-        )
-      );
+     await new Promise((r) => setTimeout(r, 400));
+     setEvents((prev) => prev.map((e) => e.id === id ? { ...e, status: "rejected", reject_reason: reason } : e));
+     const API = import.meta.env.VITE_API_URL || "http://localhost:4000";
+     const res = await fetch(`${API}/admin/events/${id}/reject`, {
+       method: "POST",
+       headers: {
+         "Authorization": `Bearer ${localStorage.getItem("token") ?? ""}`,
+         "Content-Type": "application/json",
+       },
+       body: JSON.stringify({ reason }),
+     });
+     if (!res.ok) throw new Error("Reject failed");
+     setEvents((prev) => prev.filter((e) => e.id !== id));
     } catch {
-      setError("Failed to reject (mock).");
+      setError("Failed to reject.");
     } finally {
       setBusyId(null);
     }
   }
+
 
   const pending = events.filter((e) => e.status === "submitted");
 
