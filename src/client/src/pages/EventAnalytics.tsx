@@ -9,7 +9,7 @@ export default function EventAnalytics({ eventId }: { eventId: number }) {
   const fetchAnalytics = async () => {
     try {
       const res = await fetch(`${API_URL}/org/events/${eventId}/analytics`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       const json = await res.json();
       setData(json);
@@ -22,7 +22,7 @@ export default function EventAnalytics({ eventId }: { eventId: number }) {
 
   useEffect(() => {
     fetchAnalytics();
-    const interval = setInterval(fetchAnalytics, 10000); // refresh every 10 s
+    const interval = setInterval(fetchAnalytics, 10000);
     return () => clearInterval(interval);
   }, [eventId]);
 
@@ -38,7 +38,6 @@ export default function EventAnalytics({ eventId }: { eventId: number }) {
   return (
     <div style={{ padding: "1.5rem" }}>
       <h2>{data.title} — Analytics</h2>
-
       <div style={{ display: "flex", flexWrap: "wrap", gap: "2rem" }}>
         <div>
           <h3>Key Metrics</h3>
@@ -49,20 +48,9 @@ export default function EventAnalytics({ eventId }: { eventId: number }) {
             <li>Attendance Rate: <b>{data.attendanceRate}%</b></li>
           </ul>
         </div>
-
         <PieChart width={300} height={300}>
-          <Pie
-            data={chartData}
-            cx="50%"
-            cy="50%"
-            outerRadius={100}
-            fill="#8884d8"
-            dataKey="value"
-            label
-          >
-            {chartData.map((_, i) => (
-              <Cell key={i} fill={COLORS[i % COLORS.length]} />
-            ))}
+          <Pie data={chartData} cx="50%" cy="50%" outerRadius={100} fill="#8884d8" dataKey="value" label>
+            {chartData.map((_, i) => (<Cell key={i} fill={COLORS[i % COLORS.length]} />))}
           </Pie>
           <Tooltip />
           <Legend />

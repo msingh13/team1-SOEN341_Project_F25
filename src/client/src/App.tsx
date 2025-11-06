@@ -1,166 +1,41 @@
-import { useState } from "react";
-import { Routes, Route, Link, useNavigate } from "react-router-dom";
-import TestScanner from "./pages/Testscanner";
-import ValidateTicket from "./pages/admin/ValidateTicket";
-import CreateEvent from './pages/CreateEvent';
-import EditEvent from './pages/EditEvent';
+import { Routes, Route, Link, Outlet, useParams } from "react-router-dom";
 import "./App.css";
-import ClaimTicketButton from "./components/ClaimTicketButton";
-import TicketConfirmationModal from "./components/TicketConfirmationModal";
-import {
-  claimTicket,
-  type ClaimSuccess,
-  ClaimTicketError,
-} from "./api/claimTicket";
+
+// Pages
+import CreateEvent from "./pages/CreateEvent";
+import EditEvent from "./pages/EditEvent";
 import EventDetail from "./pages/EventDetail";
 import OrganizerApprovalsPage from "./pages/admin/OrganizerApprovalsPage";
-import OrganizerEvents  from "./pages/OrganizerEvents";
-import EventAnalytics from "./pages/EventAnalytics";
-
-// @ts-ignore - JSX file in a TS project is fine for now
+import OrganizerEvents from "./pages/OrganizerEvents";
 import AdminModeration from "./pages/admin/AdminModeration";
+import Login from "./pages/Login";
+import MyTickets from "./MyTickets";
+import SavedEvents from "./pages/SavedEvents";
+import EventAnalytics from "./pages/EventAnalytics";
+import EventsList from "./pages/EventsList";
+import QRValidate from "./pages/QRValidate";
+import AdminStats from "./pages/admin/AdminStats";
 
-/* ---------- Home (pretty UI) ---------- */
-function Home() {
-  const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState("");
-  const [ticket, setTicket] = useState<ClaimSuccess | null>(null);
-  const navigate = useNavigate();
+// Components
+import Header from "./components/Header";
 
-  // demo values
-  const userRole = "student";
-  const capacity = 100;
-  const claimed = 72;
-  const hasClaimed = false;
+// Auth
+import { AuthProvider, useAuth } from "./auth/AuthContext";
+import { RoleRoute } from "./auth/guards";
 
-  const isEligible = userRole === "student";
-  const soldOut = claimed >= capacity;
+/* ---------- Small wrapper so analytics gets the real :id ---------- */
+function EventAnalyticsRoute() {
+  const { id } = useParams();
+  const eventId = Number(id);
+  return <EventAnalytics eventId={Number.isFinite(eventId) ? eventId : 0} />;
+}
 
-  const [hasClaimedUI, setHasClaimedUI] = useState(hasClaimed);
-  const [soldOutUI, setSoldOutUI] = useState(soldOut);
-
-  async function handleClaim() {
-    setMsg("");
-    setTicket(null);
-    setLoading(true);
-    try {
-      const data = await claimTicket("e_demo");
-      setTicket(data);
-      setHasClaimedUI(true);
-      setMsg("🎟️ Ticket claimed!");
-      setTimeout(() => navigate(`/events/${data.eventId}`), 1000);
-    } catch (err) {
-      if (err instanceof ClaimTicketError) {
-        if (err.reason === "sold_out") {
-          setSoldOutUI(true);
-          setMsg("❌ Sold out");
-        } else if (err.reason === "already_claimed") {
-          setHasClaimedUI(true);
-          setMsg("❌ You already claimed a ticket");
-        } else if (err.reason === "unauthorized") {
-          setMsg("🔒 You must be signed in");
-        } else {
-          setMsg("❌ Something went wrong");
-        }
-      } else {
-        setMsg("❌ Something went wrong");
-      }
-    } finally {
-      setLoading(false);
-    }
-  }
-
+/* ---------- Layout (Header + Outlet + Footer) ---------- */
+function Layout() {
   return (
     <>
-      <header className="topnav">
-        <div className="topnav-inner">
-          <Link to="/" className="brand">🎓 Campus Events</Link>
-          <nav className="links">
-            <Link to="/">Home</Link>
-            <Link to="/admin/organizers?dev=1">Admin</Link>
-            <Link to="/organizer/events">Organizer Dashboard</Link>
-            <Link to="/admin/moderation">Moderation</Link>
-            <Link to="/create">Create Event</Link> | 
-            <Link to="/edit">Edit Event</Link>
-          </nav>
-        </div>
-      </header>
-
-      <main className="container">
-        <section className="hero">
-          <div>
-            <h1 className="h1">Find events. Claim tickets. Go.</h1>
-            <p className="muted">
-              Browse by date, category, or organization and store your tickets securely.
-            </p>
-          </div>
-          <div className="hero-actions">
-            <Link className="btn" to="/events/1">Quick View: Event #1</Link>
-            <Link className="btn btn-ghost" to="/admin/organizers?dev=1">
-              Admin » Organizers
-            </Link>
-          </div>
-        </section>
-
-        <section className="card">
-          <header className="card-header">
-            <div>
-              <h2 className="h2">Claim Ticket Demo</h2>
-              <p className="muted">
-                Capacity <span className="badge">{claimed}</span> / {capacity}
-              </p>
-            </div>
-            <div className="status-wrap">
-              {soldOutUI && <span className="status status-red">Sold Out</span>}
-              {!soldOutUI && hasClaimedUI && (
-                <span className="status status-green">Claimed</span>
-              )}
-              {!soldOutUI && !hasClaimedUI && <span className="status">Available</span>}
-            </div>
-          </header>
-
-          <div className="card-body">
-            <ClaimTicketButton
-              isEligible={isEligible}
-              hasClaimed={hasClaimedUI}
-              soldOut={soldOutUI}
-              loading={loading}
-              onClick={handleClaim}
-            />
-
-            {loading && <p className="info">Talking to backend…</p>}
-            {!loading && msg && (
-              <p className="info" role="alert">{msg}</p>
-            )}
-
-            <TicketConfirmationModal
-              open={!!ticket}
-              data={ticket}
-              onClose={() => setTicket(null)}
-            />
-
-            <div className="hint">
-              After claiming, you’ll be redirected to the event detail page.
-            </div>
-          </div>
-        </section>
-
-        <section className="grid">
-          <article className="mini-card">
-            <h3 className="h3">Search & Filters</h3>
-            <p className="muted">Filter by date, category, and organization.</p>
-          </article>
-          <article className="mini-card">
-            <h3 className="h3">Save Events</h3>
-            <p className="muted">Bookmark your favorites for later.</p>
-          </article>
-          <article className="mini-card">
-            <h3 className="h3">QR Tickets</h3>
-            <p className="muted">Unique QR for fast check-in.</p>
-          </article>
-        </section>
-      </main>
-
+      <Header />
+      <Outlet />
       <footer className="footer">
         <div className="container footer-inner">
           <span className="muted">© {new Date().getFullYear()} Campus Events — Prototype</span>
@@ -173,22 +48,215 @@ function Home() {
   );
 }
 
-/* ---------- Routes ---------- */
-export default function App() {
+/* ---------- Homes by role ---------- */
+function StudentHome() {
   return (
-    <Routes>
-      <Route path="/" element={<Home />} />
-      <Route path="/events/:id" element={<EventDetail />} />
-      <Route path="/admin/organizers" element={<OrganizerApprovalsPage />} />
-      <Route path="/organizer/events" element={<OrganizerEvents />} />
-      <Route path="/organizer/events/:id/analytics" element={<EventAnalytics eventId={0} />} />
-      <Route path="*" element={<div className="container">Not Found</div>} />
-      <Route path="/test-scan" element={<TestScanner />} />
-      <Route path="/admin/validate-ticket" element={<ValidateTicket />} />
-      <Route path="/admin/moderation" element={<AdminModeration />} />
-      <Route path="/create" element={<CreateEvent />} />
-      <Route path="/edit" element={<EditEvent eventId="eventId={0}" />} />
-    </Routes>
+    <main className="container">
+      <section className="hero">
+        <div>
+          <h1 className="h1">Find events. Claim tickets. Go.</h1>
+          <p className="muted">
+            Browse by date, category, or organization and store your tickets securely.
+          </p>
+        </div>
+        <div className="hero-actions" style={{ gap: 8 }}>
+          <Link className="btn" to="/events">Browse events</Link>
+          <Link className="btn btn-ghost" to="/me/tickets">My tickets</Link>
+        </div>
+      </section>
+
+      <section className="grid">
+        <article className="mini-card">
+          <h3 className="h3">Search & Filters</h3>
+          <p className="muted">Filter by date, category, and organization.</p>
+          <Link to="/events" className="btn btn-ghost" style={{ marginTop: 8 }}>Start browsing</Link>
+        </article>
+        <article className="mini-card">
+          <h3 className="h3">Saved Events</h3>
+          <p className="muted">Bookmark your favorites for later.</p>
+          <Link to="/me/saves" className="btn btn-ghost" style={{ marginTop: 8 }}>View saved</Link>
+        </article>
+        <article className="mini-card">
+          <h3 className="h3">QR Tickets</h3>
+          <p className="muted">Unique QR for fast check-in.</p>
+          <Link to="/me/tickets" className="btn btn-ghost" style={{ marginTop: 8 }}>See my tickets</Link>
+        </article>
+      </section>
+    </main>
   );
 }
 
+function OrganizerHome() {
+  return (
+    <main className="container">
+      <section className="hero">
+        <div>
+          <h1 className="h1">Welcome, Organizer</h1>
+          <p className="muted">Create events, track capacity, and validate tickets.</p>
+        </div>
+        <div className="hero-actions" style={{ gap: 8 }}>
+          <Link className="btn" to="/organizer/events">My events</Link>
+          <Link className="btn btn-ghost" to="/create">Create event</Link>
+        </div>
+      </section>
+
+      <section className="grid">
+        <article className="mini-card">
+          <h3 className="h3">Event Management</h3>
+          <p className="muted">Edit dates, capacity, and details anytime.</p>
+          <Link to="/organizer/events" className="btn btn-ghost" style={{ marginTop: 8 }}>Go to dashboard</Link>
+        </article>
+        <article className="mini-card">
+          <h3 className="h3">Analytics</h3>
+          <p className="muted">See issued tickets, check-ins, and remaining seats.</p>
+        </article>
+        <article className="mini-card">
+          <h3 className="h3">QR Validation</h3>
+          <p className="muted">Scan and validate tickets at the door.</p>
+        </article>
+      </section>
+    </main>
+  );
+}
+
+function AdminHome() {
+  return (
+    <main className="container">
+      <section className="hero">
+        <div>
+          <h1 className="h1">Welcome, Admin</h1>
+          <p className="muted">Approve organizers, moderate events, and view platform stats.</p>
+        </div>
+        <div className="hero-actions" style={{ gap: 8 }}>
+          <Link className="btn" to="/admin/organizers">Organizations</Link>
+          <Link className="btn btn-ghost" to="/admin/moderation">Moderation</Link>
+        </div>
+      </section>
+
+      <section className="grid">
+        <article className="mini-card">
+          <h3 className="h3">Organizer Approvals</h3>
+          <p className="muted">Approve or reject organizer accounts.</p>
+        </article>
+        <article className="mini-card">
+          <h3 className="h3">Event Moderation</h3>
+          <p className="muted">Publish or reject submitted events.</p>
+        </article>
+        <article className="mini-card">
+          <h3 className="h3">Analytics</h3>
+          <p className="muted">Track events, tickets, and participation trends.</p>
+        </article>
+      </section>
+    </main>
+  );
+}
+
+function HomeLanding() {
+  const { user } = useAuth();
+  if (!user) return <StudentHome />;                 // logged-out: student-style landing
+  if (user.role === "admin") return <AdminHome />;
+  if (user.role === "organizer") return <OrganizerHome />;
+  return <StudentHome />;
+}
+
+/* ---------- App ---------- */
+export default function App() {
+  return (
+    <AuthProvider>
+      <Routes>
+        <Route element={<Layout />}>
+          <Route path="/" element={<HomeLanding />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/events" element={<EventsList />} />
+          <Route path="/events/:id" element={<EventDetail />} />
+
+          {/* Student (and above) */}
+          <Route
+            path="/me/tickets"
+            element={
+              <RoleRoute roles={["student", "organizer", "admin"]}>
+                <MyTickets />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/me/saves"
+            element={
+              <RoleRoute roles={["student", "organizer", "admin"]}>
+                <SavedEvents />
+              </RoleRoute>
+            }
+          />
+
+          {/* Organizer area */}
+          <Route
+            path="/organizer/events"
+            element={
+              <RoleRoute roles={["organizer", "admin"]}>
+                <OrganizerEvents />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/organizer/events/:id/analytics"
+            element={
+              <RoleRoute roles={["organizer", "admin"]}>
+                <EventAnalyticsRoute />
+              </RoleRoute>
+            }
+          />
+           <Route
+           path="/organizer/scan"
+           element={
+             <RoleRoute roles={["organizer", "admin"]}>
+               <QRValidate />
+             </RoleRoute>
+           }
+         />
+
+          {/* Admin area */}
+          <Route
+            path="/admin/organizers"
+            element={
+              <RoleRoute roles={["admin"]}>
+                <OrganizerApprovalsPage />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/admin/moderation"
+            element={
+              <RoleRoute roles={["admin"]}>
+                <AdminModeration />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/admin/stats"
+            element={<RoleRoute roles={["admin"]}><AdminStats /></RoleRoute>}
+          />
+
+          {/* Organizer/Admin general */}
+          <Route
+            path="/create"
+            element={
+              <RoleRoute roles={["organizer", "admin"]}>
+                <CreateEvent />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/edit"
+            element={
+              <RoleRoute roles={["organizer", "admin"]}>
+                <EditEvent />
+              </RoleRoute>
+            }
+          />
+
+          <Route path="*" element={<div className="container">Not Found</div>} />
+        </Route>
+      </Routes>
+    </AuthProvider>
+  );
+}

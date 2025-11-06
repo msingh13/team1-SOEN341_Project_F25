@@ -1,11 +1,11 @@
 // src/server/routes/events.js
 const express = require('express');
 const router = express.Router();
-const db = require('../db'); // must export { query }
+const db = require('../db');
 
 // ---- helpers ----
 function buildWhere({ q, categories, org, dateFrom, dateTo }) {
-  const where = [`e.status = 'published'`]; // <- status model
+  const where = [`e.status = 'published'`];
   const params = [];
   let i = 1;
 
@@ -55,7 +55,7 @@ router.get('/', async (req, res) => {
       : [];
     const org = req.query.org ? Number(req.query.org) : null;
     if (req.query.org && !Number.isFinite(org)) {
-      return res.status(400).json({ error: 'org must be a number' });
+      return res.status(400).json({ code: 'BAD_REQUEST', message: 'org must be a number' });
     }
     const dateFrom = req.query.dateFrom ? String(req.query.dateFrom) : null;
     const dateTo   = req.query.dateTo   ? String(req.query.dateTo)   : null;
@@ -67,26 +67,22 @@ router.get('/', async (req, res) => {
     const { whereSql, params } = buildWhere({ q, categories, org, dateFrom, dateTo });
 
     // count
-    const countSql = `
-      SELECT COUNT(*)::int AS c
-      FROM events e
-      ${whereSql}
-    `;
+    const countSql = `SELECT COUNT(*)::int AS c FROM events e ${whereSql}`;
     const { rows: countRows } = await db.query(countSql, params);
     const total = countRows[0]?.c || 0;
 
-    // data (compute tickets_claimed lazily)
+    // data (capacity math counts claimed + checked_in)
     const dataSql = `
       SELECT
         e.id, e.title, e.description, e.start_at, e.end_at,
         e.capacity,
         COALESCE((
           SELECT COUNT(*) FROM tickets t
-          WHERE t.event_id = e.id AND t.status = 'claimed'
-        ), 0) AS tickets_claimed,
-        (e.capacity - COALESCE((
+          WHERE t.event_id = e.id AND t.status IN ('claimed','checked_in')
+        ), 0) AS tickets_issued,
+        GREATEST(0, e.capacity - COALESCE((
           SELECT COUNT(*) FROM tickets t
-          WHERE t.event_id = e.id AND t.status = 'claimed'
+          WHERE t.event_id = e.id AND t.status IN ('claimed','checked_in')
         ), 0)) AS remaining_seats,
         e.location, e.category, e.org_id,
         o.name AS organizer
@@ -101,36 +97,33 @@ router.get('/', async (req, res) => {
 
     return res.json({
       data: rows,
-      pagination: {
-        page,
-        perPage,
-        total,
-        totalPages: Math.max(1, Math.ceil(total / perPage)),
-      },
+      page,
+      limit: perPage,
+      total
     });
   } catch (err) {
     console.error('❌ Error listing events:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ code: 'INTERNAL', message: 'Internal server error' });
   }
 });
 
 // ---- GET /events/:id ----
 router.get('/:id', async (req, res) => {
   const eventId = Number(req.params.id);
-  if (!Number.isFinite(eventId)) return res.status(400).json({ error: 'Invalid event ID' });
+  if (!Number.isFinite(eventId)) return res.status(400).json({ code: 'BAD_REQUEST', message: 'Invalid event ID' });
 
   try {
     const sql = `
       SELECT
-        e.id, e.title, e.description, e.start_at, e.end_at,
+        e.id, e.title, e.description, e.start_at AS start_time, e.end_at AS end_time,
         e.capacity, e.status,
         COALESCE((
           SELECT COUNT(*) FROM tickets t
-          WHERE t.event_id = e.id AND t.status = 'claimed'
-        ), 0) AS tickets_claimed,
-        (e.capacity - COALESCE((
+          WHERE t.event_id = e.id AND t.status IN ('claimed','checked_in')
+        ), 0) AS tickets_issued,
+        GREATEST(0, e.capacity - COALESCE((
           SELECT COUNT(*) FROM tickets t
-          WHERE t.event_id = e.id AND t.status = 'claimed'
+          WHERE t.event_id = e.id AND t.status IN ('claimed','checked_in')
         ), 0)) AS remaining_seats,
         e.location, e.category, e.org_id,
         o.name AS organizer
@@ -140,16 +133,16 @@ router.get('/:id', async (req, res) => {
       LIMIT 1
     `;
     const { rows } = await db.query(sql, [eventId]);
-    if (!rows.length) return res.status(404).json({ error: 'Event not found' });
+    if (!rows.length) return res.status(404).json({ code: 'NOT_FOUND', message: 'Event not found' });
 
     const ev = rows[0];
     if (ev.status !== 'published') {
-      return res.status(403).json({ error: 'Event is not published' });
+      return res.status(404).json({ code: 'NOT_FOUND', message: 'Event not found' });
     }
     return res.json(ev);
   } catch (err) {
     console.error('🔥 Error fetching event:', err);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ code: 'INTERNAL', message: 'Internal server error' });
   }
 });
 

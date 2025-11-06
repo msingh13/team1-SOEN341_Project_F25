@@ -1,177 +1,179 @@
 // src/server/routes/orgEvents.js
-// This route implements:
-// POST  /api/org/events        -> create event
-// PUT   /api/org/events/:id    -> update event
-// GET   /api/org/events/:id/attendees.csv -> download attendees CSV
-
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
-const { v4: uuidv4 } = require('uuid');
-
 const router = express.Router();
+const pool = require('../db');
+const authenticateToken = require('../middleware/auth');
 
-// Try to use real DB pool if exists
-let pool = null;
-try {
-  pool = require('../db'); // expects src/server/db/index.js exporting Pool
-} catch (err) {
-  pool = null;
+// Helper
+function sendError(res, status, code, message, details) {
+  const body = { code, message };
+  if (details) body.details = details;
+  return res.status(status).json(body);
 }
 
-// JSON-file fallback storage (for easy testing without Postgres)
-const dataDir = path.join(__dirname, '..', 'data');
-const eventsFile = path.join(dataDir, 'events.json');
-const attendeesFile = path.join(dataDir, 'attendees.json');
+// POST /api/org/events  (create)
+router.post('/', authenticateToken, async (req, res) => {
+  const userId = req.user?.id;
+  const {
+    title, description, category,
+    start_at, end_at, location,
+    capacity, ticket_type = 'free',
+  } = req.body || {};
 
-function ensureDataFiles() {
-  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
-  if (!fs.existsSync(eventsFile)) fs.writeFileSync(eventsFile, '[]', 'utf8');
-  if (!fs.existsSync(attendeesFile)) fs.writeFileSync(attendeesFile, '[]', 'utf8');
-}
-function readJSON(file) {
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { return []; }
-}
-function writeJSON(file, data) { fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf8'); }
+  // Basic validation
+  if (!title || !start_at || !location || !capacity) {
+    return sendError(res, 400, 'BAD_REQUEST', 'Missing required fields');
+  }
+  if (!Number.isFinite(Number(capacity)) || Number(capacity) <= 0) {
+    return sendError(res, 400, 'BAD_REQUEST', 'Capacity must be a positive integer');
+  }
 
-// Helper to convert attendees array to CSV
-function toCSV(rows) {
-  if (!rows || rows.length === 0) return '';
-  const keys = Object.keys(rows[0]);
-  const lines = [keys.join(',')];
-  for (const r of rows) {
-    const vals = keys.map(k => {
-      let v = r[k] === null || r[k] === undefined ? '' : String(r[k]);
-      if (v.includes(',') || v.includes('"')) {
+  try {
+    // Find organizer row for this user
+    const orgRes = await pool.query(`SELECT id FROM organizers WHERE user_id = $1`, [userId]);
+    if (orgRes.rowCount === 0) return sendError(res, 403, 'FORBIDDEN', 'Organizer role required');
+
+    const org_id = orgRes.rows[0].id;
+
+    const { rows } = await pool.query(
+      `
+      INSERT INTO events
+        (org_id, title, description, category, start_at, end_at, location, capacity, ticket_type, status, created_at, updated_at)
+      VALUES
+        ($1,$2,$3,$4,$5,$6,$7,$8,$9,'submitted', NOW(), NOW())
+      RETURNING id, org_id, title, description, category, start_at, end_at, location, capacity, ticket_type, status
+      `,
+      [org_id, title, description || null, category || null, start_at, end_at || null, location, Number(capacity), ticket_type]
+    );
+
+    return res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error('DB insert error', err);
+    return sendError(res, 500, 'INTERNAL_ERROR', 'DB error', err.message);
+  }
+});
+
+// PUT /api/org/events/:id (update before start)
+router.put('/:id', authenticateToken, async (req, res) => {
+  const userId = req.user?.id;
+  const eventId = Number(req.params.id);
+  if (!Number.isFinite(eventId)) {
+    return sendError(res, 400, 'BAD_REQUEST', 'Invalid event id');
+  }
+
+  const {
+    title, description, category,
+    start_at, end_at, location,
+    capacity, ticket_type
+  } = req.body || {};
+
+  try {
+    // Ownership + editability check
+    const { rows: own } = await pool.query(
+      `SELECT e.id, e.start_at
+         FROM events e
+         JOIN organizers o ON o.id = e.org_id
+        WHERE e.id = $1 AND o.user_id = $2`,
+      [eventId, userId]
+    );
+    if (!own.length) return sendError(res, 403, 'FORBIDDEN', 'Not your event');
+    if (own[0].start_at && new Date(own[0].start_at) <= new Date()) {
+      return sendError(res, 400, 'EVENT_STARTED', 'Cannot edit after event start');
+    }
+
+    const { rows } = await pool.query(
+      `
+      UPDATE events
+         SET title = COALESCE($2, title),
+             description = COALESCE($3, description),
+             category = COALESCE($4, category),
+             start_at = COALESCE($5, start_at),
+             end_at = COALESCE($6, end_at),
+             location = COALESCE($7, location),
+             capacity = COALESCE($8, capacity),
+             ticket_type = COALESCE($9, ticket_type),
+             updated_at = NOW()
+       WHERE id = $1
+       RETURNING id, org_id, title, description, category, start_at, end_at, location, capacity, ticket_type, status
+      `,
+      [
+        eventId,
+        title ?? null, description ?? null, category ?? null,
+        start_at ?? null, end_at ?? null, location ?? null,
+        capacity ?? null, ticket_type ?? null
+      ]
+    );
+
+    if (!rows.length) return sendError(res, 404, 'NOT_FOUND', 'Event not found');
+    return res.json(rows[0]);
+  } catch (err) {
+    console.error('DB update error', err);
+    return sendError(res, 500, 'INTERNAL_ERROR', 'DB error', err.message);
+  }
+});
+
+// GET /api/org/events/:id/attendees.csv  (CSV export)
+router.get('/:id/attendees.csv', authenticateToken, async (req, res) => {
+  const userId = req.user?.id;
+  const eventId = Number(req.params.id);
+  if (!Number.isFinite(eventId)) {
+    return sendError(res, 400, 'BAD_REQUEST', 'Invalid event id');
+  }
+
+  try {
+    // Ownership check
+    const { rows: own } = await pool.query(
+      `SELECT e.id
+         FROM events e
+         JOIN organizers o ON o.id = e.org_id
+        WHERE e.id = $1 AND o.user_id = $2`,
+      [eventId, userId]
+    );
+    if (!own.length) return sendError(res, 403, 'FORBIDDEN', 'Not your event');
+
+   // Join users + tickets for CSV (no student_id)
+const { rows } = await pool.query(
+  `
+  SELECT
+    u.name           AS attendee_name,
+    u.email          AS email,
+    t.id             AS ticket_id,
+    t.status         AS ticket_status,
+    t.issued_at      AS issued_at,
+    t.checked_in_at  AS checked_in_at
+  FROM tickets t
+  JOIN users u   ON u.id = t.user_id
+  WHERE t.event_id = $1
+  ORDER BY t.issued_at NULLS LAST, t.id
+  `,
+  [eventId]
+);
+
+// Build CSV (remove student_id from header)
+const keys = [
+  "attendee_name",
+  "email",
+  "ticket_id",
+  "ticket_status",
+  "issued_at",
+  "checked_in_at",
+];
+
+    const header = keys.join(",");
+    const lines = rows.map(r => keys.map(k => {
+      let v = r[k] == null ? "" : String(r[k]);
+      if (v.includes(",") || v.includes('"') || v.includes("\n")) {
         v = '"' + v.replace(/"/g, '""') + '"';
       }
       return v;
-    });
-    lines.push(vals.join(','));
-  }
-  return lines.join('\n');
-}
+    }).join(","));
 
-// POST create event
-router.post('/', async (req, res) => {
-  const {
-    title, description, date, startTime, endTime, location, capacity, ticketType, createdBy
-  } = req.body || {};
-
-  if (!title || !date) return res.status(400).json({ error: 'title and date required' });
-
-  // If pool exists, store in DB
-  if (pool) {
-    try {
-      const q = `INSERT INTO events (title, description, date, start_time, end_time, location, capacity, ticket_type, created_by, created_at)
-                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW()) RETURNING *;`;
-      const vals = [title, description || null, date, startTime || null, endTime || null, location || null, capacity || null, ticketType || 'free', createdBy || null];
-      const { rows } = await pool.query(q, vals);
-      return res.status(201).json(rows[0]);
-    } catch (err) {
-      console.error('DB insert error', err);
-      return res.status(500).json({ error: 'DB error' });
-    }
-  }
-
-  // Fallback: JSON file storage
-  try {
-    ensureDataFiles();
-    const events = readJSON(eventsFile);
-    const newEvent = {
-      id: uuidv4(),
-      title, description: description || '', date, start_time: startTime || null, end_time: endTime || null,
-      location: location || '', capacity: capacity || 0, ticket_type: ticketType || 'free', created_by: createdBy || 'unknown',
-      created_at: new Date().toISOString()
-    };
-    events.push(newEvent);
-    writeJSON(eventsFile, events);
-    return res.status(201).json(newEvent);
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="attendees-${eventId}.csv"`);
+    return res.send([header, ...lines].join("\n"));
   } catch (err) {
-    console.error('Fallback insert error', err);
-    return res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// PUT update event
-router.put('/:id', async (req, res) => {
-  const id = req.params.id;
-  const {
-    title, description, date, startTime, endTime, location, capacity, ticketType
-  } = req.body || {};
-
-  if (pool) {
-    try {
-      const q = `UPDATE events SET title=$1, description=$2, date=$3, start_time=$4, end_time=$5, location=$6,
-                 capacity=$7, ticket_type=$8, updated_at=NOW() WHERE id=$9 RETURNING *;`;
-      const vals = [title, description || null, date, startTime || null, endTime || null, location || null, capacity || null, ticketType || 'free', id];
-      const { rows } = await pool.query(q, vals);
-      if (!rows[0]) return res.status(404).json({ error: 'Event not found' });
-      return res.json(rows[0]);
-    } catch (err) {
-      console.error('DB update error', err);
-      return res.status(500).json({ error: 'DB error' });
-    }
-  }
-
-  // Fallback JSON file
-  try {
-    ensureDataFiles();
-    const events = readJSON(eventsFile);
-    const idx = events.findIndex(e => e.id === id);
-    if (idx === -1) return res.status(404).json({ error: 'Event not found' });
-    const ev = events[idx];
-    events[idx] = {
-      ...ev,
-      title: title ?? ev.title,
-      description: description ?? ev.description,
-      date: date ?? ev.date,
-      start_time: startTime ?? ev.start_time,
-      end_time: endTime ?? ev.end_time,
-      location: location ?? ev.location,
-      capacity: capacity ?? ev.capacity,
-      ticket_type: ticketType ?? ev.ticket_type,
-      updated_at: new Date().toISOString()
-    };
-    writeJSON(eventsFile, events);
-    return res.json(events[idx]);
-  } catch (err) {
-    console.error('Fallback update error', err);
-    return res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// GET attendees CSV for an event id
-router.get('/:id/attendees.csv', async (req, res) => {
-  const id = req.params.id;
-
-  if (pool) {
-    try {
-      // Example: attendees table with id, event_id, name, email, ticket_id, checked_in
-      const q = `SELECT name, email, ticket_id, checked_in, created_at FROM attendees WHERE event_id = $1 ORDER BY created_at;`;
-      const { rows } = await pool.query(q, [id]);
-      const csv = toCSV(rows);
-      res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename="attendees-${id}.csv"`);
-      return res.send(csv);
-    } catch (err) {
-      console.error('DB attendees error', err);
-      return res.status(500).send('Server error');
-    }
-  }
-
-  // JSON fallback: read attendees.json and filter
-  try {
-    ensureDataFiles();
-    const attendees = readJSON(attendeesFile);
-    const rows = attendees.filter(a => a.event_id === id);
-    const csv = toCSV(rows);
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename="attendees-${id}.csv"`);
-    return res.send(csv);
-  } catch (err) {
-    console.error('Fallback attendees error', err);
-    return res.status(500).send('Server error');
+    console.error('DB attendees error', err);
+    return sendError(res, 500, 'INTERNAL_ERROR', 'Server error', err.message);
   }
 });
 

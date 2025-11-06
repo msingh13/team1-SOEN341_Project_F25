@@ -75,14 +75,17 @@ export default function EventDetail() {
     };
   }, [id]);
 
-  async function handleClaim() {
-    if (!id || claimLoading) return;
-    setClaimLoading(true);
-    try {
-      const result = await claimTicket(`e_${id}`); // demo: use your helper
-      setTicket(result);
-      setHasClaimed(true);
-    } catch (e) {
+  // ...
+async function handleClaim() {
+  if (!id || claimLoading) return;
+  setClaimLoading(true);
+  try {
+    // ✅ pass numeric id to your API helper
+    const result = await claimTicket(Number(id));
+    setTicket(result);
+    setHasClaimed(true);
+  } catch (e) {
+    // unchanged…
       if (e instanceof ClaimTicketError) {
         alert(
           e.reason === "sold_out"
@@ -133,6 +136,30 @@ export default function EventDetail() {
 
   const soldOut = event.remaining_seats <= 0;
 
+  function downloadIcs(ev: {title:string; start_time:string; end_time?:string; location?:string}) {
+    const lines = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Campus Events//EN",
+      "BEGIN:VEVENT",
+      `UID:${ev.title}-${ev.start_time}`,
+      `DTSTAMP:${new Date().toISOString().replace(/[-:]/g,"").split(".")[0]}Z`,
+      `DTSTART:${ev.start_time.replace(/[-:]/g,"").split(".")[0]}Z`,
+      ev.end_time ? `DTEND:${ev.end_time.replace(/[-:]/g,"").split(".")[0]}Z` : "",
+      `SUMMARY:${ev.title}`,
+      ev.location ? `LOCATION:${ev.location}` : "",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].filter(Boolean).join("\r\n");
+    const blob = new Blob([lines], { type: "text/calendar;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${ev.title}.ics`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+  
+
   return (
     <div style={{ padding: "2rem", maxWidth: 820, margin: "0 auto" }}>
       <header style={{ marginBottom: 12 }}>
@@ -172,6 +199,7 @@ export default function EventDetail() {
         <div style={{ marginTop: 16, display: "flex", gap: 12, alignItems: "center" }}>
           {/* Save button (your reusable component) */}
           <SaveButton eventId={event.id} onChange={() => { /* optional */ }} />
+          <button className="btn btn-ghost" onClick={() => downloadIcs(event)}>Add to Calendar</button>
 
           {/* Claim button (students only) */}
           {isStudent && (
@@ -217,4 +245,9 @@ function Info({ label, value }: { label: string; value: string }) {
       <div style={{ fontWeight: 600 }}>{value}</div>
     </div>
   );
+
+  
+  
+
+
 }

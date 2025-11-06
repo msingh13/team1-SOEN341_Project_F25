@@ -1,16 +1,8 @@
-// src/client/lib/api.ts
-const API_BASE = (import.meta as any)?.env?.VITE_API_URL || "http://localhost:3000";
+// src/client/lib/qrVal.api.ts
+const API_BASE = (import.meta as any)?.env?.VITE_API_URL || "http://localhost:4000";
 
-export function getAuthToken(): string | null {
-  const raw = localStorage.getItem("token");
-  if (!raw) return null;
-  try {
-    const obj = JSON.parse(raw);
-    if (obj?.token) return obj.token;
-    if (obj?.jwt) return obj.jwt;
-    if (typeof obj === "string") return obj;
-  } catch { return raw; }
-  return null;
+function getAuthToken(): string | null {
+  return localStorage.getItem("token");
 }
 
 export type ValidateSuccess = {
@@ -27,17 +19,27 @@ export type ValidateFailure = {
 
 export async function validateTicket(qrData: string): Promise<ValidateSuccess | ValidateFailure> {
   const token = getAuthToken();
-  const res = await fetch(`${API_BASE}/org/tickets/validate`, {
+
+  // ✅ backend expects { token } and endpoint is /tickets/validate
+  const res = await fetch(`${API_BASE}/tickets/validate`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ qrData }), 
+    body: JSON.stringify({ token: qrData }),
   });
+
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    return { ok: false, status: data?.status || "error", message: data?.message || "Validation failed" };
-    }
-  return { ok: true, status: "valid", attendee: data.attendee ?? data.user ?? {}, ticket: data.ticket ?? {} };
+    return { ok: false, status: data?.code === "DUPLICATE" ? "duplicate" : "error", message: data?.message || "Validation failed" };
+  }
+
+  // your controller returns: ticketId, eventId, userId, status, checkedInAt
+  return {
+    ok: true,
+    status: "valid",
+    attendee: { id: data.userId }, // you can extend later
+    ticket: { id: data.ticketId, status: data.status },
+  };
 }
