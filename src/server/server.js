@@ -72,4 +72,15 @@ pool
   .then(() => console.log("✅ DB ping OK"))
   .catch((err) => console.error("❌ DB ping FAILED", err));
 
+// --- Export app for testing ---
+if (process.env.NODE_ENV !== "test") {
+  app.listen(PORT, () => console.log(`🚀 Server running at http://localhost:${PORT}`));
+
+  pool
+    .query("SELECT 1")
+    .then(() => console.log("✅ DB ping OK"))
+    .catch((err) => console.error("❌ DB ping FAILED", err));
+}
+
+
 module.exports = app;

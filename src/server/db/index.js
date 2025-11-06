@@ -42,4 +42,16 @@ pool.on("error", (err) => {
   }
 })();
 
+if (process.env.NODE_ENV !== "test") {
+  (async () => {
+    try {
+      const r = await pool.query("SELECT 1 as up");
+      if (r?.rows?.[0]?.up === 1) console.log("DB sanity check OK");
+    } catch (e) {
+      console.error("DB sanity check failed", e);
+    }
+  })();
+}
+
+
 module.exports = pool;

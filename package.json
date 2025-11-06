@@ -2,5 +2,25 @@
   "dependencies": {
     "@types/recharts": "^1.8.29",
     "recharts": "^3.3.0"
+  },
+  "scripts": {
+    "test": "jest --detectOpenHandles --runInBand"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jsonwebtoken": "^9.0.2",
+    "supertest": "^6.3.4"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "<rootDir>/tests/**/*.(test|spec).js"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/"
+    ],
+    "roots": [
+      "<rootDir>"
+    ]
   }
 }
