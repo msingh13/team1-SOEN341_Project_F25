@@ -1,89 +1,84 @@
 // src/lib/api.ts
 // -------------------------------------------------------------
-// Purpose:
-//   Centralized helper functions for calling the backend API.
-//
-// Description:
-//   Handles HTTP requests for the Save/Unsave feature (Task STU-03-FE).
-//   Includes helper methods for all endpoints:
-//     - POST /events/:id/save
-//     - DELETE /events/:id/save
-//     - GET /me/saves
-//
-// Notes:
-//   - Uses fetch() with consistent error handling
-//   - Sends a dev-only "x-user-id" header (since real auth isn't built yet)
+// Centralized backend API helpers (Save/Unsave + My Saves).
+// Reads base URL and dev user ID from Vite env, with safe fallbacks.
+// Adds a request timeout to avoid hanging UI during demo.
 // -------------------------------------------------------------
 
-// Base URL for backend API (from .env)
-const BASE_URL: string = import.meta.env.VITE_API_URL || "http://localhost:3000";
+let API_BASE = import.meta.env.VITE_API_URL || "http://localhost:4000";
+let DEV_USER_ID = import.meta.env.VITE_DEV_USER_ID || "3";
+const DEFAULT_TIMEOUT_MS = 8000;
 
-// Temporary "logged-in" user for local testing
-const DEV_USER_ID: string = import.meta.env.VITE_DEV_USER_ID || "3";
+// Optional runtime switches (handy for demos/tests)
+export function setApiBase(url: string) { API_BASE = url.replace(/\/+$/, ""); }
+export function setDevUser(id: string)   { DEV_USER_ID = id; }
 
-// Custom error interface (adds extra properties to normal Error)
+// Custom error type
 interface ApiError extends Error {
   status?: number;
   code?: string;
-  details?: any;
+  details?: unknown;
 }
 
-// Generic helper for all HTTP calls
-async function http(method: string, path: string, body?: any): Promise<any> {
-  // Send the HTTP request
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      "x-user-id": DEV_USER_ID, // local dev authentication
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+// Core fetch helper with timeout
+async function http(method: string, path: string, body?: unknown): Promise<any> {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
 
-  // Parse response body (may be JSON or empty)
-  const text = await res.text();
-  let data: any = null;
   try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    // ignore parse errors, leave data as null
-  }
+    const res = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        "x-user-id": DEV_USER_ID, // dev auth header (backend should accept this)
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    });
 
-  // Handle failed requests with uniform error shape
-  if (!res.ok) {
-    const err: ApiError = new Error((data && data.message) || `HTTP ${res.status}`);
-    err.status = res.status;
-    err.code = data?.code;
-    err.details = data?.details;
-    throw err;
-  }
+    const text = await res.text();
+    const data = text ? safeJson(text) : null;
 
-  // Return parsed data for successful requests
-  return data;
+    if (!res.ok) {
+      const err: ApiError = new Error((data && data.message) || `HTTP ${res.status}`);
+      err.status = res.status;
+      err.code = (data && data.code) as string | undefined;
+      err.details = data?.details;
+      throw err;
+    }
+    return data;
+  } catch (e: any) {
+    if (e?.name === "AbortError") {
+      const err: ApiError = new Error("Request timed out");
+      err.code = "TIMEOUT";
+      throw err;
+    }
+    throw e;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+function safeJson(text: string) {
+  try { return JSON.parse(text); } catch { return null; }
 }
 
 // -------------------------------------------------------------
-// STU-03 API ENDPOINTS
+// Save / Unsave / List APIs
 // -------------------------------------------------------------
-
-// Save an event for the current user
 export function saveEvent(eventId: number | string) {
   return http("POST", `/events/${eventId}/save`);
 }
 
-// Remove (unsave) an event from the user's saved list
 export function unsaveEvent(eventId: number | string) {
   return http("DELETE", `/events/${eventId}/save`);
 }
 
-// Retrieve all events saved by the current user
 export function listMySaves() {
   return http("GET", `/me/saves`);
 }
 
-// Helper: check if a specific event is already saved
 export async function isEventSaved(eventId: number | string): Promise<boolean> {
   const data = await listMySaves();
-  // Return true if eventId exists in saved list
-  return data.items?.some((e: any) => String(e.id) === String(eventId)) ?? false;
+  return data?.items?.some((e: any) => String(e.id) === String(eventId)) ?? false;
 }

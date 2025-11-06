@@ -1,5 +1,8 @@
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import type { ClaimSuccess } from "../api/claimTicket";
+// If you use React Router uncomment:
+// import { Link } from "react-router-dom";
 
 type Props = {
   open: boolean;
@@ -9,16 +12,46 @@ type Props = {
 
 export default function TicketConfirmationModal({ open, data, onClose }: Props) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const firstFocusableRef = useRef<HTMLButtonElement>(null);
+  const lastFocusableRef = useRef<HTMLAnchorElement | HTMLButtonElement>(null);
 
-  // Close on Escape and move focus into the dialog when it opens
+  // Lock background scroll while open
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", onKey);
+    const { overflow } = document.body.style;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = overflow; };
+  }, [open]);
+
+  // Focus management + Esc to close
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "Tab") {
+        // minimal focus trap
+        const focusables = panelRef.current?.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (!focusables || focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          (last as HTMLElement).focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          (first as HTMLElement).focus();
+        }
+      }
+    };
 
     const prev = document.activeElement as HTMLElement | null;
-    panelRef.current?.focus();
+    // move focus in
+    setTimeout(() => firstFocusableRef.current?.focus(), 0);
 
+    document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
       prev?.focus?.();
@@ -27,12 +60,12 @@ export default function TicketConfirmationModal({ open, data, onClose }: Props) 
 
   if (!open || !data) return null;
 
-  return (
-    // Overlay
+  const content = (
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="ticket-confirm-title"
+      aria-describedby="ticket-confirm-desc"
       onClick={onClose}
       style={{
         position: "fixed",
@@ -43,9 +76,9 @@ export default function TicketConfirmationModal({ open, data, onClose }: Props) 
         justifyContent: "center",
         padding: 16,
         zIndex: 1000,
+        animation: "fadeIn 120ms ease-out",
       }}
     >
-      {/* Panel */}
       <div
         ref={panelRef}
         tabIndex={-1}
@@ -58,12 +91,33 @@ export default function TicketConfirmationModal({ open, data, onClose }: Props) 
           borderRadius: 16,
           padding: 20,
           boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
+          transform: "translateY(0)",
+          animation: "popIn 140ms ease-out",
         }}
       >
-        <h2 id="ticket-confirm-title" style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>
-          Ticket claimed!
-        </h2>
-        <p style={{ marginTop: 6, color: "#555" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <h2 id="ticket-confirm-title" style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>
+            Ticket claimed!
+          </h2>
+          <span aria-hidden="true">🎟️</span>
+          <button
+            ref={firstFocusableRef}
+            onClick={onClose}
+            aria-label="Close dialog"
+            style={{
+              marginLeft: "auto",
+              padding: "6px 10px",
+              borderRadius: 10,
+              border: "1px solid #ddd",
+              background: "#f7f7f7",
+              cursor: "pointer",
+            }}
+          >
+            Close
+          </button>
+        </div>
+
+        <p id="ticket-confirm-desc" style={{ marginTop: 6, color: "#555" }}>
           You successfully claimed your ticket for this event.
         </p>
 
@@ -75,17 +129,30 @@ export default function TicketConfirmationModal({ open, data, onClose }: Props) 
         </div>
 
         <div style={{ marginTop: 16, display: "flex", gap: 8 }}>
-          <a href="/me/tickets" style={{ padding: "8px 12px", borderRadius: 12, border: "1px solid #ddd", textDecoration: "none" }}>
+          {/* If SPA: replace <a> with <Link to="/me/tickets" ref={lastFocusableRef as any}> */}
+          <a
+            href="/me/tickets"
+            ref={lastFocusableRef as any}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 12,
+              border: "1px solid #ddd",
+              textDecoration: "none",
+            }}
+          >
             View my tickets
           </a>
-          <button
-            onClick={onClose}
-            style={{ marginLeft: "auto", padding: "8px 12px", borderRadius: 12, background: "#111", color: "white", border: "none" }}
-          >
-            Close
-          </button>
         </div>
       </div>
+      <style>
+        {`
+        @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes popIn { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: translateY(0) } }
+        `}
+      </style>
     </div>
   );
+
+  // Render at document.body to avoid stacking/overflow issues
+  return createPortal(content, document.body);
 }
