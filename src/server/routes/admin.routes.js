@@ -22,4 +22,5 @@ router.post("/events/:id/publish", moderation.publishEvent);
 // POST /admin/events/:id/reject → reject a submitted event
 router.post("/events/:id/reject", moderation.rejectEvent);
 
+
 module.exports = router;
