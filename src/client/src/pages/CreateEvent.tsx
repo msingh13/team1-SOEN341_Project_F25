@@ -31,8 +31,8 @@ const inputStyle: React.CSSProperties = {
 };
 
 export default function CreateEvent(): JSX.Element {
-  const BASE_URL = ((import.meta as any).env?.VITE_API_URL as string) || "http://localhost:4000";
-  const DEV_USER_ID = ((import.meta as any).env?.VITE_DEV_USER_ID as string) || "2"; // organizer account for dev testing
+  const BASE_URL = (import.meta as any).env?.VITE_API_URL || "http://localhost:4000";
+  const DEV_USER_ID = (import.meta as any).env?.VITE_DEV_USER_ID || "2";
 
   const [form, setForm] = useState<FormState>({
     title: "",

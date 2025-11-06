@@ -1,23 +1,32 @@
+// src/server/middleware/auth.js
 const jwt = require("jsonwebtoken");
 
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader)
-    return res.status(401).json({ message: "No token provided" });
+module.exports = function authenticateToken(req, res, next) {
+  const hdr = req.headers.authorization || "";
+  const m = hdr.match(/^Bearer\s+(.+)$/i);
 
-  const [type, token] = authHeader.split(" ");
-  if (type !== "Bearer" || !token)
-    return res.status(401).json({ message: "Invalid token format" });
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "devsecret");
-    req.user = decoded;
-    console.log("Token authenticated for user ID:", decoded.id);
-    next();
-  } catch (err) {
-    console.error("JWT verify failed:", err.message);
-    return res.status(403).json({ message: "Invalid or expired token" });
+  // Bearer JWT path
+  if (m) {
+    try {
+      const payload = jwt.verify(m[1], process.env.JWT_SECRET || "devsecret");
+      const idNum = Number(payload.id);
+      if (!Number.isFinite(idNum)) {
+        return res.status(401).json({ code: "UNAUTHORIZED", message: "Invalid token payload" });
+      }
+      req.user = { id: idNum, role: payload.role || "student" };
+      return next();
+    } catch (e) {
+      return res.status(401).json({ code: "UNAUTHORIZED", message: "Invalid token" });
+    }
   }
-}
 
-module.exports = authenticateToken;
+// Dev fallback: X-User-Id header
+  const devId = req.headers["x-user-id"];
+  if (devId && Number.isFinite(Number(devId))) {
+    req.user = { id: Number(devId) };
+    return next();
+   }
+
+
+  return res.status(401).json({ code: "UNAUTHORIZED", message: "Missing token" });
+};

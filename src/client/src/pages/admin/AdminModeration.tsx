@@ -1,16 +1,31 @@
-// src/client/src/pages/admin/AdminModeration.jsx
+// src/client/src/pages/admin/AdminModeration.tsx
 // Lightweight, FRONTEND-ONLY mock of the moderation dashboard.
 // - Lists a few "submitted" events from local state
 // - Lets you Publish / Reject (with reason) and updates UI instantly
-// - No backend calls here (we'll wire real API later if needed)
+// - No backend calls here (wire real API later)
 
 import { useEffect, useState } from "react";
 
+type ModerationStatus = "submitted" | "published" | "rejected";
+
+type ModerationEvent = {
+  id: number;
+  title: string;
+  description?: string;
+  category?: string;
+  organizer?: string;
+  start_at?: string; // ISO
+  status: ModerationStatus;
+  reject_reason?: string;
+};
+
+type ReasonsMap = Record<number, string>;
+
 export default function AdminModeration() {
-  const [events, setEvents] = useState([]);
-  const [busyId, setBusyId] = useState(null);
-  const [reasons, setReasons] = useState({}); // { [id]: "reason" }
-  const [error, setError] = useState(null);
+  const [events, setEvents] = useState<ModerationEvent[]>([]);
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [reasons, setReasons] = useState<ReasonsMap>({});
+  const [error, setError] = useState<string | null>(null);
 
   // seed some fake submitted events on first load
   useEffect(() => {
@@ -36,21 +51,21 @@ export default function AdminModeration() {
     ]);
   }, []);
 
-  function onChangeReason(id, val) {
+  function onChangeReason(id: number, val: string) {
     setReasons((prev) => ({ ...prev, [id]: val }));
   }
 
   // “Publish” — purely local update
-  async function onPublish(id) {
+  async function onPublish(id: number) {
     setBusyId(id);
     setError(null);
     try {
       // pretend round-trip
       await new Promise((r) => setTimeout(r, 400));
       setEvents((prev) =>
-        prev.map((e) => (e.id === id ? { ...e, status: "published" } : e))
+        prev.map((e) => (e.id === id ? { ...e, status: "published" as const } : e))
       );
-    } catch (e) {
+    } catch {
       setError("Failed to publish (mock).");
     } finally {
       setBusyId(null);
@@ -58,7 +73,7 @@ export default function AdminModeration() {
   }
 
   // “Reject” — requires a reason; purely local update
-  async function onReject(id) {
+  async function onReject(id: number) {
     const reason = (reasons[id] || "").trim();
     if (!reason) {
       alert("Please provide a rejection reason.");
@@ -69,9 +84,13 @@ export default function AdminModeration() {
     try {
       await new Promise((r) => setTimeout(r, 400));
       setEvents((prev) =>
-        prev.map((e) => (e.id === id ? { ...e, status: "rejected", reject_reason: reason } : e))
+        prev.map((e) =>
+          e.id === id
+            ? { ...e, status: "rejected" as const, reject_reason: reason }
+            : e
+        )
       );
-    } catch (e) {
+    } catch {
       setError("Failed to reject (mock).");
     } finally {
       setBusyId(null);
@@ -116,25 +135,25 @@ export default function AdminModeration() {
             >
               <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
                 <h3 style={{ margin: 0, color: "black" }}>{ev.title}</h3>
-                    <span
-                    style={{
-                        padding: "4px 10px",
-                        borderRadius: 12,
-                        fontSize: 12,
-                        fontWeight: "bold",
-                        color: "black",
-                        background:
-                        ev.status === "submitted"
-                            ? "green" 
-                            : ev.status === "published"
-                            ? "#27ae60" // green
-                            : "#e74c3c", // red
-                        border: "none",
-                        textTransform: "capitalize",
-                    }}
-                    >
-                    {ev.status}
-                    </span>
+                <span
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: 12,
+                    fontSize: 12,
+                    fontWeight: "bold",
+                    color: "black",
+                    background:
+                      ev.status === "submitted"
+                        ? "green"
+                        : ev.status === "published"
+                        ? "#27ae60" // green
+                        : "#e74c3c", // red
+                    border: "none",
+                    textTransform: "capitalize",
+                  }}
+                >
+                  {ev.status}
+                </span>
               </div>
 
               <p style={{ margin: "8px 0 6px", color: "#555" }}>
@@ -152,16 +171,19 @@ export default function AdminModeration() {
               </p>
 
               <div style={{ marginTop: 10 }}>
-                <label htmlFor={`reason-${ev.id}`} style={{ display: "block", fontSize: 12, color: "red", fontWeight: "bold" }}>
-            Rejection reason (required to reject):
-            </label>
+                <label
+                  htmlFor={`reason-${ev.id}`}
+                  style={{ display: "block", fontSize: 12, color: "red", fontWeight: "bold" }}
+                >
+                  Rejection reason (required to reject):
+                </label>
                 <textarea
                   id={`reason-${ev.id}`}
                   rows={2}
                   placeholder="Explain why this event is rejected"
                   value={reasons[ev.id] || ""}
                   onChange={(e) => onChangeReason(ev.id, e.target.value)}
-                  style={{ width: "100%", resize: "vertical", marginTop: 4}}
+                  style={{ width: "100%", resize: "vertical", marginTop: 4 }}
                 />
               </div>
 
@@ -180,7 +202,7 @@ export default function AdminModeration() {
                     padding: "6px 10px",
                     borderRadius: 4,
                     cursor: "pointer",
-                    }}
+                  }}
                 >
                   {busyId === ev.id ? "Rejecting…" : "Reject"}
                 </button>
