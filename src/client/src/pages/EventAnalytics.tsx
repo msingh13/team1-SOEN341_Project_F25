@@ -8,9 +8,8 @@ export default function EventAnalytics({ eventId }: { eventId: number }) {
 
   const fetchAnalytics = async () => {
     try {
-      const token = localStorage.getItem("token");
       const res = await fetch(`${API_URL}/org/events/${eventId}/analytics`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       const json = await res.json();
       setData(json);

@@ -13,6 +13,8 @@ import MyTickets from "./MyTickets";
 import SavedEvents from "./pages/SavedEvents";
 import EventAnalytics from "./pages/EventAnalytics";
 import EventsList from "./pages/EventsList";
+import QRValidate from "./pages/QRValidate";
+import AdminStats from "./pages/admin/AdminStats";
 
 // Components
 import Header from "./components/Header";
@@ -203,6 +205,14 @@ export default function App() {
               </RoleRoute>
             }
           />
+           <Route
+           path="/organizer/scan"
+           element={
+             <RoleRoute roles={["organizer", "admin"]}>
+               <QRValidate />
+             </RoleRoute>
+           }
+         />
 
           {/* Admin area */}
           <Route
@@ -220,6 +230,10 @@ export default function App() {
                 <AdminModeration />
               </RoleRoute>
             }
+          />
+          <Route
+            path="/admin/stats"
+            element={<RoleRoute roles={["admin"]}><AdminStats /></RoleRoute>}
           />
 
           {/* Organizer/Admin general */}

@@ -1,6 +1,6 @@
 // src/pages/admin/OrganizerApprovalsPage.tsx
 import { useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useAuth } from "../../auth/AuthContext"
 
 type Pending = {
   id: number;
@@ -11,11 +11,17 @@ type Pending = {
 };
 
 export default function OrganizerApprovalsPage() {
-  const [search] = useSearchParams();
 
-  // DEV ONLY ACCESS: ?dev=1 OR VITE_ADMIN_BYPASS=1
-  const isAdmin =
-    search.get("dev") === "1" || import.meta.env.VITE_ADMIN_BYPASS === "1";
+// ...
+const { hasRole } = useAuth();
+const isAdmin = hasRole("admin");
+
+if (!isAdmin) {
+  // You can redirect or render nothing; since the route already uses <RoleRoute roles={["admin"]} />,
+  // this block is technically unnecessary. Safe to remove entirely.
+  return null;
+}
+
 
   const [pending, setPending] = useState<Pending[]>([
     {

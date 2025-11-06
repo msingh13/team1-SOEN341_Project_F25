@@ -19,10 +19,15 @@ export default function Header() {
             <Link to="/organizer/events">Organizer Dashboard</Link>
           )}
 
+          {hasRole("organizer", "admin") && (
+            <Link to="/organizer/scan">Scan</Link>
+          )}
+
           {hasRole("admin") && (
             <>
               <Link to="/admin/organizers">Admin</Link>
               <Link to="/admin/moderation">Moderation</Link>
+              <Link to="/admin/stats">Analytics</Link>
             </>
           )}
 
