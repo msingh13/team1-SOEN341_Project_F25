@@ -1,12 +1,12 @@
+// src/pages/EditEvent.tsx
 import React, { useEffect, useState, type JSX } from "react";
 import axios from "axios";
 import { useParams } from "react-router-dom";
 
-// --- types ---
 type TicketType = "free" | "paid";
 
 interface EditEventProps {
-  /** Optional prop to support both prop and /events/:id/edit */
+  /** Optional prop if you ever render this outside /events/:id/edit */
   eventId?: string;
 }
 
@@ -14,7 +14,7 @@ interface EventWire {
   id: string;
   title: string;
   description?: string | null;
-  start_time?: string | null;
+  start_time?: string | null; // public GET uses start_time / end_time
   end_time?: string | null;
   location?: string | null;
   capacity?: number | null;
@@ -28,26 +28,27 @@ interface FormState {
   startTime: string;  // HH:mm
   endTime: string;    // HH:mm
   location: string;
-  capacity: string;   // keep as string for input control, cast on submit
+  capacity: string;
   ticketType: TicketType;
 }
 
 type Toast = { type: "success" | "error"; msg: string } | null;
 
-// --- helpers ---
+// ---- helpers ----
 function isoToParts(iso?: string | null): { date: string; time: string } {
   if (!iso) return { date: "", time: "" };
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, "0");
-  const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  return { date, time };
+  return {
+    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+  };
 }
 
 function partsToIso(
   date: string | null | undefined,
   time?: string | null,
-  fallbackTime: string = "09:00"
+  fallbackTime = "09:00"
 ): string | null {
   if (!date) return null;
   const t = time || fallbackTime;
@@ -56,19 +57,20 @@ function partsToIso(
 }
 
 const inputStyle: React.CSSProperties = {
-  padding: "8px 10px",
-  borderRadius: 6,
+  padding: "12px 14px",
+  borderRadius: 10,
   border: "1px solid #2b2b2b",
   background: "#1b1b1b",
   color: "white",
+  width: "100%",
 };
 
 export default function EditEvent(props: EditEventProps): JSX.Element {
   const { id: idFromRoute } = useParams<{ id: string }>();
-  const eventId = props.eventId ?? idFromRoute; // supports both prop and /events/:id/edit
+  const eventId = props.eventId ?? idFromRoute;
 
-  const BASE_URL = (import.meta as any).env?.VITE_API_URL || "http://localhost:4000";
-  const DEV_USER_ID = (import.meta as any).env?.VITE_DEV_USER_ID || "2"; // organizer for dev
+  const BASE_URL =
+    ((import.meta as any).env?.VITE_API_URL as string) || "http://localhost:4000";
 
   const [form, setForm] = useState<FormState>({
     title: "",
@@ -86,11 +88,10 @@ export default function EditEvent(props: EditEventProps): JSX.Element {
   const [toast, setToast] = useState<Toast>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  // --- load event ---
+  // ---- load event (public GET /events/:id) ----
   useEffect(() => {
     let cancel = false;
-
-    async function load() {
+    (async () => {
       if (!eventId) {
         setErr("Missing event id");
         setLoading(false);
@@ -101,7 +102,10 @@ export default function EditEvent(props: EditEventProps): JSX.Element {
 
       try {
         const res = await axios.get<EventWire>(`${BASE_URL}/events/${eventId}`, {
-          headers: { "X-User-Id": DEV_USER_ID },
+          headers: {
+            // Public endpoint in your app, token not required — but sending is fine:
+            Authorization: `Bearer ${localStorage.getItem("token") ?? ""}`,
+          },
         });
         const ev = res.data;
         const start = isoToParts(ev.start_time ?? null);
@@ -130,13 +134,12 @@ export default function EditEvent(props: EditEventProps): JSX.Element {
       } finally {
         if (!cancel) setLoading(false);
       }
-    }
+    })();
 
-    load();
     return () => {
       cancel = true;
     };
-  }, [eventId, BASE_URL, DEV_USER_ID]);
+  }, [eventId, BASE_URL]);
 
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -145,6 +148,7 @@ export default function EditEvent(props: EditEventProps): JSX.Element {
     setForm((f) => ({ ...f, [name]: value }));
   }
 
+  // ---- save (PUT /api/org/events/:id) with snake_case keys ----
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!eventId) return;
@@ -156,18 +160,19 @@ export default function EditEvent(props: EditEventProps): JSX.Element {
     try {
       const payload = {
         title: form.title,
-        description: form.description,
-        location: form.location,
+        description: form.description || null,
+        category: null, // keep optional
+        start_at: partsToIso(form.date, form.startTime, "09:00"),
+        end_at: partsToIso(form.date, form.endTime, "17:00"),
+        location: form.location || null,
         capacity: Number(form.capacity || 0),
         ticket_type: form.ticketType,
-        start_time: partsToIso(form.date, form.startTime, "09:00"),
-        end_time: partsToIso(form.date, form.endTime, "17:00"),
       };
 
-      await axios.put(`${BASE_URL}/events/${eventId}`, payload, {
+      await axios.put(`${BASE_URL}/api/org/events/${eventId}`, payload, {
         headers: {
           "Content-Type": "application/json",
-          "X-User-Id": DEV_USER_ID,
+          Authorization: `Bearer ${localStorage.getItem("token") ?? ""}`,
         },
       });
 
@@ -187,18 +192,19 @@ export default function EditEvent(props: EditEventProps): JSX.Element {
     }
   }
 
-  // --- export attendees CSV ---
+  // ---- export attendees CSV (GET /api/org/events/:id/attendees.csv) ----
   const handleExportCSV = async () => {
     if (!eventId) return;
     try {
       const response = await axios.get<Blob>(
-             `${BASE_URL}/api/org/events/${eventId}/attendees.csv`,
-              {
-                responseType: "blob",
-                headers: { "Authorization": `Bearer ${localStorage.getItem("token") ?? ""}` },
-              }
-            );
-  
+        `${BASE_URL}/api/org/events/${eventId}/attendees.csv`,
+        {
+          responseType: "blob",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token") ?? ""}`,
+          },
+        }
+      );
 
       const blob = response.data;
       const url = window.URL.createObjectURL(blob);
@@ -211,7 +217,6 @@ export default function EditEvent(props: EditEventProps): JSX.Element {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error("Error exporting CSV:", error);
       alert("Error exporting CSV");
     }
@@ -356,7 +361,6 @@ export default function EditEvent(props: EditEventProps): JSX.Element {
             {saving ? "Saving…" : "Save Changes"}
           </button>
 
-          {/* Optional CSV export button */}
           <button
             type="button"
             onClick={handleExportCSV}
@@ -376,7 +380,7 @@ export default function EditEvent(props: EditEventProps): JSX.Element {
       </form>
 
       <p style={{ marginTop: 10, color: "#888", textAlign: "center", fontSize: 13 }}>
-        Organizer demo — GET/PUT {BASE_URL}/events/{eventId}
+        Organizer — PUT {BASE_URL}/api/org/events/{eventId} (auth required)
       </p>
     </div>
   );

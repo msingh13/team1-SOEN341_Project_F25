@@ -1,36 +1,31 @@
-import { Routes, Route, Link, Outlet, useParams } from "react-router-dom";
+// src/App.tsx
+import { Routes, Route, Outlet, useParams } from "react-router-dom";
 import "./App.css";
 
 // Pages
+import Home from "./pages/Home";
+import BrowseEvents from "./pages/BrowseEvents";
 import CreateEvent from "./pages/CreateEvent";
 import EditEvent from "./pages/EditEvent";
 import EventDetail from "./pages/EventDetail";
-import OrganizerApprovalsPage from "./pages/admin/OrganizerApprovalsPage";
 import OrganizerEvents from "./pages/OrganizerEvents";
+import EventAnalytics from "./pages/EventAnalytics";
+import OrganizerApprovalsPage from "./pages/admin/OrganizerApprovalsPage";
 import AdminModeration from "./pages/admin/AdminModeration";
+import OrganizationsPage from "./pages/admin/OrganizationsPage";
 import Login from "./pages/Login";
 import MyTickets from "./MyTickets";
 import SavedEvents from "./pages/SavedEvents";
-import EventAnalytics from "./pages/EventAnalytics";
-import EventsList from "./pages/EventsList";
-import QRValidate from "./pages/QRValidate";
-import AdminStats from "./pages/admin/AdminStats";
+import Scan from "./pages/Scan";
 
 // Components
 import Header from "./components/Header";
 
 // Auth
-import { AuthProvider, useAuth } from "./auth/AuthContext";
+import { AuthProvider } from "./auth/AuthContext";
 import { RoleRoute } from "./auth/guards";
 
-/* ---------- Small wrapper so analytics gets the real :id ---------- */
-function EventAnalyticsRoute() {
-  const { id } = useParams();
-  const eventId = Number(id);
-  return <EventAnalytics eventId={Number.isFinite(eventId) ? eventId : 0} />;
-}
-
-/* ---------- Layout (Header + Outlet + Footer) ---------- */
+/* ---------- Layout ---------- */
 function Layout() {
   return (
     <>
@@ -48,127 +43,23 @@ function Layout() {
   );
 }
 
-/* ---------- Homes by role ---------- */
-function StudentHome() {
-  return (
-    <main className="container">
-      <section className="hero">
-        <div>
-          <h1 className="h1">Find events. Claim tickets. Go.</h1>
-          <p className="muted">
-            Browse by date, category, or organization and store your tickets securely.
-          </p>
-        </div>
-        <div className="hero-actions" style={{ gap: 8 }}>
-          <Link className="btn" to="/events">Browse events</Link>
-          <Link className="btn btn-ghost" to="/me/tickets">My tickets</Link>
-        </div>
-      </section>
-
-      <section className="grid">
-        <article className="mini-card">
-          <h3 className="h3">Search & Filters</h3>
-          <p className="muted">Filter by date, category, and organization.</p>
-          <Link to="/events" className="btn btn-ghost" style={{ marginTop: 8 }}>Start browsing</Link>
-        </article>
-        <article className="mini-card">
-          <h3 className="h3">Saved Events</h3>
-          <p className="muted">Bookmark your favorites for later.</p>
-          <Link to="/me/saves" className="btn btn-ghost" style={{ marginTop: 8 }}>View saved</Link>
-        </article>
-        <article className="mini-card">
-          <h3 className="h3">QR Tickets</h3>
-          <p className="muted">Unique QR for fast check-in.</p>
-          <Link to="/me/tickets" className="btn btn-ghost" style={{ marginTop: 8 }}>See my tickets</Link>
-        </article>
-      </section>
-    </main>
-  );
+/* ---------- Analytics wrapper uses :id ---------- */
+function EventAnalyticsRoute() {
+  const { id } = useParams();
+  const eventId = Number(id);
+  return <EventAnalytics eventId={Number.isFinite(eventId) ? eventId : 0} />;
 }
 
-function OrganizerHome() {
-  return (
-    <main className="container">
-      <section className="hero">
-        <div>
-          <h1 className="h1">Welcome, Organizer</h1>
-          <p className="muted">Create events, track capacity, and validate tickets.</p>
-        </div>
-        <div className="hero-actions" style={{ gap: 8 }}>
-          <Link className="btn" to="/organizer/events">My events</Link>
-          <Link className="btn btn-ghost" to="/create">Create event</Link>
-        </div>
-      </section>
-
-      <section className="grid">
-        <article className="mini-card">
-          <h3 className="h3">Event Management</h3>
-          <p className="muted">Edit dates, capacity, and details anytime.</p>
-          <Link to="/organizer/events" className="btn btn-ghost" style={{ marginTop: 8 }}>Go to dashboard</Link>
-        </article>
-        <article className="mini-card">
-          <h3 className="h3">Analytics</h3>
-          <p className="muted">See issued tickets, check-ins, and remaining seats.</p>
-        </article>
-        <article className="mini-card">
-          <h3 className="h3">QR Validation</h3>
-          <p className="muted">Scan and validate tickets at the door.</p>
-        </article>
-      </section>
-    </main>
-  );
-}
-
-function AdminHome() {
-  return (
-    <main className="container">
-      <section className="hero">
-        <div>
-          <h1 className="h1">Welcome, Admin</h1>
-          <p className="muted">Approve organizers, moderate events, and view platform stats.</p>
-        </div>
-        <div className="hero-actions" style={{ gap: 8 }}>
-          <Link className="btn" to="/admin/organizers">Organizations</Link>
-          <Link className="btn btn-ghost" to="/admin/moderation">Moderation</Link>
-        </div>
-      </section>
-
-      <section className="grid">
-        <article className="mini-card">
-          <h3 className="h3">Organizer Approvals</h3>
-          <p className="muted">Approve or reject organizer accounts.</p>
-        </article>
-        <article className="mini-card">
-          <h3 className="h3">Event Moderation</h3>
-          <p className="muted">Publish or reject submitted events.</p>
-        </article>
-        <article className="mini-card">
-          <h3 className="h3">Analytics</h3>
-          <p className="muted">Track events, tickets, and participation trends.</p>
-        </article>
-      </section>
-    </main>
-  );
-}
-
-function HomeLanding() {
-  const { user } = useAuth();
-  if (!user) return <StudentHome />;                 // logged-out: student-style landing
-  if (user.role === "admin") return <AdminHome />;
-  if (user.role === "organizer") return <OrganizerHome />;
-  return <StudentHome />;
-}
-
-/* ---------- App ---------- */
 export default function App() {
   return (
     <AuthProvider>
       <Routes>
         <Route element={<Layout />}>
-          <Route path="/" element={<HomeLanding />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/events" element={<EventsList />} />
+          {/* Public */}
+          <Route path="/" element={<Home />} />
+          <Route path="/events" element={<BrowseEvents />} />
           <Route path="/events/:id" element={<EventDetail />} />
+          <Route path="/login" element={<Login />} />
 
           {/* Student (and above) */}
           <Route
@@ -188,12 +79,20 @@ export default function App() {
             }
           />
 
-          {/* Organizer area */}
+          {/* Organizer */}
           <Route
             path="/organizer/events"
             element={
-              <RoleRoute roles={["organizer", "admin"]}>
+              <RoleRoute roles={["organizer"]}>
                 <OrganizerEvents />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/organizer/events/:id/edit"
+            element={
+              <RoleRoute roles={["organizer", "admin"]}>
+                <EditEvent />
               </RoleRoute>
             }
           />
@@ -205,24 +104,24 @@ export default function App() {
               </RoleRoute>
             }
           />
-           <Route
-           path="/organizer/scan"
-           element={
-             <RoleRoute roles={["organizer", "admin"]}>
-               <QRValidate />
-             </RoleRoute>
-           }
-         />
-
-          {/* Admin area */}
           <Route
-            path="/admin/organizers"
+            path="/create"
             element={
-              <RoleRoute roles={["admin"]}>
-                <OrganizerApprovalsPage />
+              <RoleRoute roles={["organizer"]}>
+                <CreateEvent />
               </RoleRoute>
             }
           />
+          <Route
+            path="/scan"
+            element={
+              <RoleRoute roles={["organizer", "admin"]}>
+                <Scan />
+              </RoleRoute>
+            }
+          />
+
+          {/* Admin */}
           <Route
             path="/admin/moderation"
             element={
@@ -232,28 +131,23 @@ export default function App() {
             }
           />
           <Route
-            path="/admin/stats"
-            element={<RoleRoute roles={["admin"]}><AdminStats /></RoleRoute>}
-          />
-
-          {/* Organizer/Admin general */}
-          <Route
-            path="/create"
+            path="/admin/organizers"
             element={
-              <RoleRoute roles={["organizer", "admin"]}>
-                <CreateEvent />
+              <RoleRoute roles={["admin"]}>
+                <OrganizerApprovalsPage />
               </RoleRoute>
             }
           />
           <Route
-            path="/edit"
+            path="/admin/orgs"
             element={
-              <RoleRoute roles={["organizer", "admin"]}>
-                <EditEvent />
+              <RoleRoute roles={["admin"]}>
+                <OrganizationsPage />
               </RoleRoute>
             }
           />
 
+          {/* 404 */}
           <Route path="*" element={<div className="container">Not Found</div>} />
         </Route>
       </Routes>

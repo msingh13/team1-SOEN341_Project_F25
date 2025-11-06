@@ -61,12 +61,15 @@ app.use("/", ticketRoute);
 app.use("/", organizerRoutes);
 
 // Alt organizer events mount (your FE uses /api/org/events)
-app.use("/api/org/events", orgEventsRouter);
-
+// mount routes
+app.use('/me', require('./routes/me'));                 // <-- NEW
+app.use('/api/org/events', require('./routes/orgEvents')); // <-- your existing router (now has GET /)
 // Admin routes
 app.use("/", adminOrgsRouter);
 app.use("/admin", adminRouter);
 app.use("/", adminAnalyticsRouter);
+app.use("/admin/orgs", require("./routes/adminOrgs"));
+
 
 
 
