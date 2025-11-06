@@ -102,7 +102,8 @@ Desktop.ini
 /src/client/node_modules/
 /src/server/node_modules/
 /backend/node_modules/
-
+/src/client/client/node_modules/
+/src/client/client/** 
 # ================================
 # Frontend & Backend build outputs
 # ================================
@@ -114,3 +115,4 @@ Desktop.ini
 # ================================
 .env
 .env.local
+.vite/
