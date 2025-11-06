@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, type JSX } from "react";
 import axios from "axios";
 import { useParams } from "react-router-dom";
 
@@ -191,7 +191,7 @@ export default function EditEvent(props: EditEventProps): JSX.Element {
   const handleExportCSV = async () => {
     if (!eventId) return;
     try {
-      const response = await axios.get<Blob>(`/api/org/events/${eventId}/attendees.csv`, {
+        const response = await axios.get<Blob>(`${BASE_URL}/api/org/events/${eventId}/attendees.csv`, {
         responseType: "blob",
       });
 

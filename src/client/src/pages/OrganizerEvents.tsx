@@ -1,19 +1,18 @@
 import { useEffect, useState } from "react";
 
+type EventRow = {
+  id: number;
+  title: string;
+  start_at: string;   // matches backend
+  location: string;
+  remaining: number;
+  capacity: number;
+  status: string;
+};
+
 export default function OrganizerEvents() {
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
-  const DEV_USER_ID = import.meta.env.VITE_DEV_USER_ID || "2";
-  interface Event {
-    id: number;
-    title: string;
-    startAt: string;
-    location: string;
-    remaining: number;
-    capacity: number;
-    status: string;
-  }
-  
-  const [events, setEvents] = useState<Event[]>([]);
+  const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -23,13 +22,14 @@ export default function OrganizerEvents() {
     async function fetchEvents() {
       setLoading(true);
       try {
+        const token = localStorage.getItem("token");
         const res = await fetch(
-          `${API_URL}/me/events?page=${page}&perPage=10&sort=${sort}`,
-          { headers: { "X-User-Id": DEV_USER_ID } }
+          `${API_URL}/org/events?page=${page}&limit=10&sort=${sort}`,
+          { headers: token ? { Authorization: `Bearer ${token}` } : {} }
         );
-        const data = await res.json();
-        setEvents(data.data || []);
-        setTotalPages(data.totalPages || 1);
+        const json = await res.json();
+        setEvents(json.data || []);
+        setTotalPages(json.totalPages || 1);
       } catch (err) {
         console.error(err);
       } finally {
@@ -37,11 +37,10 @@ export default function OrganizerEvents() {
       }
     }
     fetchEvents();
-  }, [page, sort]);
+  }, [API_URL, page, sort]);
 
   if (loading) return <p>Loading your events...</p>;
-  if (!events.length)
-    return <p style={{ padding: "1rem" }}>You haven’t created any events yet.</p>;
+  if (!events.length) return <p style={{ padding: "1rem" }}>You haven’t created any events yet.</p>;
 
   return (
     <div style={{ padding: "1.5rem" }}>
@@ -76,7 +75,7 @@ export default function OrganizerEvents() {
           {events.map((e) => (
             <tr key={e.id} style={{ textAlign: "center", borderBottom: "1px solid #333" }}>
               <td>{e.title}</td>
-              <td>{new Date(e.startAt).toLocaleString()}</td>
+              <td>{new Date(e.start_at).toLocaleString()}</td>
               <td>{e.location}</td>
               <td>{e.remaining} / {e.capacity}</td>
               <td>{e.status}</td>
