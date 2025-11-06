@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "test": "echo \"Running placeholder tests\" && exit 0"
+    "test:smoke": "node ../../tests/smoke.cjs"
   },
   "keywords": [],
   "author": "",
