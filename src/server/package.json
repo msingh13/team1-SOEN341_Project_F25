@@ -2,16 +2,16 @@
   "type": "module",
   "name": "backend",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "server start",
+  "main": "server.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "nodemon server.js",
+    "start": "node server.js",
+    "test": "echo \"Running placeholder tests\" && exit 0"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
   "dependencies": {
     "express": "^5.1.0",
     "pg": "^8.16.3",

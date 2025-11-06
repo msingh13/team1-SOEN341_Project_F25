@@ -1,23 +1,18 @@
-import { Router } from "express";
-import jwt from "jsonwebtoken";
+// src/server/routes/dev.js
+const { Router } = require("express");
+const jwt = require("jsonwebtoken");
 
 const router = Router();
 
 router.post("/login", (req, res) => {
+  const id = req.body?.id;
+  const password = req.body?.password; // (unused here)
 
-    const id = req.body?.id;
-    const password = req.body?.password;
+  if (!id) return res.status(400).json({ message: "ID is required" });
 
-    if(!id) 
-        return res.status(400).json({ message: 'ID is required' });
-    
-    const token = jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    console.log(`User ${id} logged in, token generated.`);
-    console.log(token);
-   
-    
+  const token = jwt.sign({ id }, process.env.JWT_SECRET || "devsecret", { expiresIn: "1h" });
+  console.log(`User ${id} logged in, token generated.`);
+  res.json({ token });
+});
 
-    res.json({ token });
-})
-
-export default router;
+module.exports = router;
