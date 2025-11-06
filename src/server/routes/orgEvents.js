@@ -131,32 +131,39 @@ router.get('/:id/attendees.csv', authenticateToken, async (req, res) => {
     );
     if (!own.length) return sendError(res, 403, 'FORBIDDEN', 'Not your event');
 
-    // Join users + tickets for CSV
-    const { rows } = await pool.query(
-      `
-      SELECT
-        u.name           AS attendee_name,
-        u.student_id     AS student_id,
-        u.email          AS email,
-        t.id             AS ticket_id,
-        t.status         AS ticket_status,
-        t.issued_at      AS issued_at,
-        t.checked_in_at  AS checked_in_at
-      FROM tickets t
-      JOIN users u   ON u.id = t.user_id
-      WHERE t.event_id = $1
-      ORDER BY t.issued_at NULLS LAST, t.id
-      `,
-      [eventId]
-    );
+   // Join users + tickets for CSV (no student_id)
+const { rows } = await pool.query(
+  `
+  SELECT
+    u.name           AS attendee_name,
+    u.email          AS email,
+    t.id             AS ticket_id,
+    t.status         AS ticket_status,
+    t.issued_at      AS issued_at,
+    t.checked_in_at  AS checked_in_at
+  FROM tickets t
+  JOIN users u   ON u.id = t.user_id
+  WHERE t.event_id = $1
+  ORDER BY t.issued_at NULLS LAST, t.id
+  `,
+  [eventId]
+);
 
-    // Build CSV
-    const keys = ["attendee_name","student_id","email","ticket_id","ticket_status","issued_at","checked_in_at"];
+// Build CSV (remove student_id from header)
+const keys = [
+  "attendee_name",
+  "email",
+  "ticket_id",
+  "ticket_status",
+  "issued_at",
+  "checked_in_at",
+];
+
     const header = keys.join(",");
     const lines = rows.map(r => keys.map(k => {
       let v = r[k] == null ? "" : String(r[k]);
       if (v.includes(",") || v.includes('"') || v.includes("\n")) {
-        v = '"' + v.replace(/"/g,'"') + '"';
+        v = '"' + v.replace(/"/g, '""') + '"';
       }
       return v;
     }).join(","));

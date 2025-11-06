@@ -18,10 +18,17 @@ router.get("/org/events", authenticateToken, async (req, res) => {
   const offset = (page - 1) * limit;
 
   try {
-    const orgResult = await pool.query("SELECT id FROM organizers WHERE user_id = $1", [userId]);
-    if (orgResult.rowCount === 0) return sendError(res, 403, "FORBIDDEN", "Organizer role required");
-
-    const orgId = orgResult.rows[0].id;
+    const orgResult = await pool.query(
+      "SELECT org_id FROM organizers WHERE user_id = $1",
+      [userId]
+    );
+    
+    if (orgResult.rowCount === 0) {
+      return sendError(res, 403, "FORBIDDEN", "Organizer role required");
+    }
+    
+    const orgId = orgResult.rows[0].org_id;
+    
 
     const { rows: data } = await pool.query(
       `
