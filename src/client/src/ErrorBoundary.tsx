@@ -11,27 +11,63 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-
-    console.error("ErrorBoundary caught an error", error, info);
-
+    // Log the full stack trace for developers
+    console.error("⚠️ ErrorBoundary caught an error:", error, info);
   }
+
+  handleReload = () => {
+    this.setState({ error: null });
+    window.location.reload();
+  };
 
   render() {
     if (this.state.error) {
       return (
-        <pre
+        <div
           style={{
-            whiteSpace: "pre-wrap",
-            color: "red",
-            padding: 16,
-            background: "#fee",
-            borderRadius: 8,
+            padding: 24,
+            borderRadius: 12,
+            background: "#3d1010",
+            border: "1px solid #a43b3b",
+            color: "#ffb5b5",
+            maxWidth: 600,
+            margin: "40px auto",
+            textAlign: "center",
           }}
         >
-          {this.state.error.message || String(this.state.error)}
-        </pre>
+          <h2>Something went wrong 😢</h2>
+          <pre
+            style={{
+              whiteSpace: "pre-wrap",
+              textAlign: "left",
+              background: "#2a1c1c",
+              color: "#ffc0c0",
+              padding: "10px 14px",
+              borderRadius: 8,
+              overflowX: "auto",
+              marginTop: 12,
+            }}
+          >
+            {this.state.error.message || String(this.state.error)}
+          </pre>
+          <button
+            onClick={this.handleReload}
+            style={{
+              marginTop: 16,
+              padding: "8px 12px",
+              borderRadius: 8,
+              border: "none",
+              background: "#2563eb",
+              color: "white",
+              cursor: "pointer",
+            }}
+          >
+            Reload App
+          </button>
+        </div>
       );
     }
+
     return this.props.children;
   }
 }

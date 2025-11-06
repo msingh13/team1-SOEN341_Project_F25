@@ -1,74 +1,36 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
-import { Link } from "react-router-dom";
-import ClaimTicketButton from './components/ClaimTicketButton';
-import { claimTicket, type ClaimSuccess, ClaimTicketError } from "./api/claimTicket";
+import { useState } from "react";
+import { Routes, Route, Link, useNavigate } from "react-router-dom";
+import TestScanner from "./pages/Testscanner";
+import ValidateTicket from "./pages/admin/ValidateTicket";
+import CreateEvent from './pages/CreateEvent';
+import EditEvent from './pages/EditEvent';
+import "./App.css";
+import ClaimTicketButton from "./components/ClaimTicketButton";
 import TicketConfirmationModal from "./components/TicketConfirmationModal";
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from "react-router-dom";
+import {
+  claimTicket,
+  type ClaimSuccess,
+  ClaimTicketError,
+} from "./api/claimTicket";
 import EventDetail from "./pages/EventDetail";
+import OrganizerApprovalsPage from "./pages/admin/OrganizerApprovalsPage";
+import OrganizerEvents  from "./pages/OrganizerEvents";
+import EventAnalytics from "./pages/EventAnalytics";
 
-import { Routes, Route, Link } from 'react-router-dom'
-import OrganizerApprovalsPage from './pages/admin/OrganizerApprovalsPage'
+// @ts-ignore - JSX file in a TS project is fine for now
+import AdminModeration from "./pages/admin/AdminModeration";
 
-
-function App() {
-  const [count, setCount] = useState(0)
-
-  return (
-  <div>
-    {/* simple nav while developing */}
-    <nav style={{ padding: '8px' }}>
-      <Link to="/">Home</Link>{" | "}
-      <Link to="/admin/organizers?dev=1">Admin » Organizers</Link>
-    </nav>
-
-    <Routes>
-      <Route
-        path="/"
-        element={
-          <>
-            <div>
-              <a href="https://vite.dev" target="_blank">
-                <img src={viteLogo} className="logo" alt="Vite logo" />
-              </a>
-              <a href="https://react.dev" target="_blank">
-                <img src={reactLogo} className="logo react" alt="React logo" />
-              </a>
-            </div>
-            <h1>Vite + React</h1>
-            <div className="card">
-              <button onClick={() => setCount((count) => count + 1)}>
-                count is {count}
-              </button>
-              <p>
-                Edit <code>src/App.tsx</code> and save to test HMR
-              </p>
-            </div>
-            <p className="read-the-docs">
-              Click on the Vite and React logos to learn more
-            </p>
-          </>
-        }
-      />
-      <Route path="/admin/organizers" element={<OrganizerApprovalsPage />} />
-      <Route path="*" element={<div style={{ padding: 16 }}>Not Found</div>} />
-    </Routes>
-  </div>
-)
-
-// --- Home Page Component ---
+/* ---------- Home (pretty UI) ---------- */
 function Home() {
-  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState("");
   const [ticket, setTicket] = useState<ClaimSuccess | null>(null);
-  const navigate = useNavigate(); // ✅ Hook for redirection
+  const navigate = useNavigate();
 
-  // Temporary mock data
+  // demo values
   const userRole = "student";
   const capacity = 100;
-  const claimed = 99;
+  const claimed = 72;
   const hasClaimed = false;
 
   const isEligible = userRole === "student";
@@ -77,34 +39,31 @@ function Home() {
   const [hasClaimedUI, setHasClaimedUI] = useState(hasClaimed);
   const [soldOutUI, setSoldOutUI] = useState(soldOut);
 
-  // Handle claim ticket logic
-  async function handleClaimClick() {
-    setMessage("");
+  async function handleClaim() {
+    setMsg("");
     setTicket(null);
     setLoading(true);
     try {
       const data = await claimTicket("e_demo");
       setTicket(data);
       setHasClaimedUI(true);
-      setMessage("Ticket claimed!");
-
-      // ✅ Redirect to Event Detail page after success
-      setTimeout(() => {
-        navigate(`/events/${data.eventId}`);
-      }, 1500); // slight delay for UX
+      setMsg("🎟️ Ticket claimed!");
+      setTimeout(() => navigate(`/events/${data.eventId}`), 1000);
     } catch (err) {
       if (err instanceof ClaimTicketError) {
         if (err.reason === "sold_out") {
           setSoldOutUI(true);
-          setMessage("Sold out ❌");
+          setMsg("❌ Sold out");
         } else if (err.reason === "already_claimed") {
           setHasClaimedUI(true);
-          setMessage("You already claimed a ticket ❌");
+          setMsg("❌ You already claimed a ticket");
         } else if (err.reason === "unauthorized") {
-          setMessage("You must be signed in ❌");
+          setMsg("🔒 You must be signed in");
+        } else {
+          setMsg("❌ Something went wrong");
         }
       } else {
-        setMessage("Something went wrong ❌");
+        setMsg("❌ Something went wrong");
       }
     } finally {
       setLoading(false);
@@ -112,65 +71,124 @@ function Home() {
   }
 
   return (
-    <div style={{ textAlign: "center" }}>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
+    <>
+      <header className="topnav">
+        <div className="topnav-inner">
+          <Link to="/" className="brand">🎓 Campus Events</Link>
+          <nav className="links">
+            <Link to="/">Home</Link>
+            <Link to="/admin/organizers?dev=1">Admin</Link>
+            <Link to="/organizer/events">Organizer Dashboard</Link>
+            <Link to="/admin/moderation">Moderation</Link>
+            <Link to="/create">Create Event</Link> | 
+            <Link to="/edit">Edit Event</Link>
+          </nav>
+        </div>
+      </header>
 
-      <h1>Vite + React</h1>
-      <h2>Claim Ticket Demo</h2>
+      <main className="container">
+        <section className="hero">
+          <div>
+            <h1 className="h1">Find events. Claim tickets. Go.</h1>
+            <p className="muted">
+              Browse by date, category, or organization and store your tickets securely.
+            </p>
+          </div>
+          <div className="hero-actions">
+            <Link className="btn" to="/events/1">Quick View: Event #1</Link>
+            <Link className="btn btn-ghost" to="/admin/organizers?dev=1">
+              Admin » Organizers
+            </Link>
+          </div>
+        </section>
 
-      <ClaimTicketButton
-        isEligible={isEligible}
-        hasClaimed={hasClaimedUI}
-        soldOut={soldOutUI}
-        loading={loading}
-        onClick={handleClaimClick}
-      />
+        <section className="card">
+          <header className="card-header">
+            <div>
+              <h2 className="h2">Claim Ticket Demo</h2>
+              <p className="muted">
+                Capacity <span className="badge">{claimed}</span> / {capacity}
+              </p>
+            </div>
+            <div className="status-wrap">
+              {soldOutUI && <span className="status status-red">Sold Out</span>}
+              {!soldOutUI && hasClaimedUI && (
+                <span className="status status-green">Claimed</span>
+              )}
+              {!soldOutUI && !hasClaimedUI && <span className="status">Available</span>}
+            </div>
+          </header>
 
-      {loading && <p>⏳ Talking to backend…</p>}
-      {!loading && message && <p role="alert">{message}</p>}
+          <div className="card-body">
+            <ClaimTicketButton
+              isEligible={isEligible}
+              hasClaimed={hasClaimedUI}
+              soldOut={soldOutUI}
+              loading={loading}
+              onClick={handleClaim}
+            />
 
-      <TicketConfirmationModal
-        open={!!ticket}
-        data={ticket}
-        onClose={() => setTicket(null)}
-      />
+            {loading && <p className="info">Talking to backend…</p>}
+            {!loading && msg && (
+              <p className="info" role="alert">{msg}</p>
+            )}
 
-      {/* Manual navigation button (for testing) */}
-      <div style={{ marginTop: "2rem" }}>
-        <Link
-          to="/events/1"
-          style={{
-            textDecoration: "none",
-            background: "#2563eb",
-            color: "white",
-            padding: "0.5rem 1rem",
-            borderRadius: "8px",
-          }}
-        >
-          View Event Details
-        </Link>
-      </div>
-    </div>
+            <TicketConfirmationModal
+              open={!!ticket}
+              data={ticket}
+              onClose={() => setTicket(null)}
+            />
+
+            <div className="hint">
+              After claiming, you’ll be redirected to the event detail page.
+            </div>
+          </div>
+        </section>
+
+        <section className="grid">
+          <article className="mini-card">
+            <h3 className="h3">Search & Filters</h3>
+            <p className="muted">Filter by date, category, and organization.</p>
+          </article>
+          <article className="mini-card">
+            <h3 className="h3">Save Events</h3>
+            <p className="muted">Bookmark your favorites for later.</p>
+          </article>
+          <article className="mini-card">
+            <h3 className="h3">QR Tickets</h3>
+            <p className="muted">Unique QR for fast check-in.</p>
+          </article>
+        </section>
+      </main>
+
+      <footer className="footer">
+        <div className="container footer-inner">
+          <span className="muted">© {new Date().getFullYear()} Campus Events — Prototype</span>
+          <a className="muted" href="https://vite.dev" target="_blank" rel="noreferrer">
+            Built with Vite + React
+          </a>
+        </div>
+      </footer>
+    </>
   );
 }
 
-// --- Main Router Wrapper ---
-function App() {
+/* ---------- Routes ---------- */
+export default function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/events/:id" element={<EventDetail />} />
-      </Routes>
-    </Router>
+    <Routes>
+      <Route path="/" element={<Home />} />
+      <Route path="/events/:id" element={<EventDetail />} />
+      <Route path="/admin/organizers" element={<OrganizerApprovalsPage />} />
+      <Route path="/organizer/events" element={<OrganizerEvents />} />
+      <Route path="/organizer/events/:id/analytics" element={<EventAnalytics eventId={0} />} />
+      <Route path="*" element={<div className="container">Not Found</div>} />
+      <Route path="/test-scan" element={<TestScanner />} />
+      <Route path="/admin/validate-ticket" element={<ValidateTicket />} />
+      <Route path="/admin/moderation" element={<AdminModeration />} />
+      <Route path="/create" element={<CreateEvent />} />
+      <Route path="/edit" element={<EditEvent eventId="eventId={0}" />} />
+    </Routes>
   );
 }
 
-export default App;

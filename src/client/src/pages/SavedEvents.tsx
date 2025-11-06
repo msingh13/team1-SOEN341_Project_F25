@@ -1,122 +1,155 @@
 // src/pages/SavedEvents.tsx
-// -------------------------------------------------------------
-// Purpose:
-//   Displays a list of all events that the current user has saved.
-//
-// Description:
-//   - Fetches saved events from the backend (or mock mode).
-//   - Shows loading and error states.
-//   - Renders each event in a simple grid/card layout.
-// -------------------------------------------------------------
-
 import { useEffect, useState } from "react";
-import { listMySaves } from "../lib/api"; // our helper from api.ts
+import { Link } from "react-router-dom";
+import { listMySaves } from "../lib/api";
 import { on } from "../lib/bus";
+import SaveButton from "../components/SaveButton";
 
-// Type definition for a single event item
-interface EventItem {
+type SavedEventWire = {
+  id: number;
+  title: string;
+  description?: string;
+  // backend might send either start_time or startTime — support both
+  start_time?: string;
+  startTime?: string;
+  end_time?: string | null;
+  endTime?: string | null;
+  location?: string;
+};
+
+type EventItem = {
   id: number;
   title: string;
   description?: string;
   startTime?: string;
   endTime?: string | null;
   location?: string;
-}
+};
 
 export default function SavedEvents() {
-  // -------------------------------------------------------------
-  // State variables
-  // -------------------------------------------------------------
-  const [events, setEvents] = useState<EventItem[]>([]); // list of saved events
-  const [loading, setLoading] = useState<boolean>(true); // tracks if data is loading
-  const [error, setError] = useState<string | null>(null); // tracks any errors
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // -------------------------------------------------------------
-  // useEffect → fetch saved events on mount AND when "saves:changed" event fires
-  // -------------------------------------------------------------
-  useEffect(() => {
-    // Helper function to load saved events
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await listMySaves();
-        setEvents(data.items || []);
-      } catch (e: any) {
-        setError(e.message || "Failed to load saved events");
-      } finally {
-        setLoading(false);
-      }
+  async function load() {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await listMySaves();
+      const items: SavedEventWire[] = data.items || [];
+      // normalize keys to camelCase for UI
+      const normalized: EventItem[] = items.map((e) => ({
+        id: e.id,
+        title: e.title,
+        description: e.description,
+        startTime: e.startTime ?? e.start_time,
+        endTime: e.endTime ?? e.end_time,
+        location: e.location,
+      }));
+      setEvents(normalized);
+    } catch (e: any) {
+      setError(e.message || "Failed to load saved events");
+    } finally {
+      setLoading(false);
     }
+  }
 
-    // 1️⃣ Load events initially when the component mounts
+  useEffect(() => {
     load();
-
-    // 2️⃣ Subscribe to global "saves:changed" event
-    const off = on("saves:changed", () => {
-      // Whenever SaveButton emits this event, reload list
-      load();
-    });
-
-    // 3️⃣ Cleanup: unsubscribe when component unmounts
+    const off = on("saves:changed", load);
     return () => off();
-  }, []);// empty dependency → runs only once when component mounts
+  }, []);
 
-  // -------------------------------------------------------------
-  // Render UI for different states (loading, error, no data)
-  // -------------------------------------------------------------
-  if (loading) return <p style={{ padding: 20 }}>Loading saved events...</p>;
-  if (error) return <p style={{ padding: 20, color: "red" }}>{error}</p>;
+  if (loading) return <p style={{ padding: 20 }}>Loading saved events…</p>;
+
+  if (error)
+    return (
+      <div style={{ padding: 20 }}>
+        <p style={{ color: "red" }}>{error}</p>
+        <button onClick={load} style={{ marginTop: 8 }}>Retry</button>
+      </div>
+    );
+
   if (events.length === 0)
-    return <p style={{ padding: 20 }}>You haven't saved any events yet.</p>;
+    return <p style={{ padding: 20 }}>You haven’t saved any events yet.</p>;
 
-  // -------------------------------------------------------------
-  // Render the list of saved events in a grid layout
-  // -------------------------------------------------------------
   return (
     <div style={{ padding: 20 }}>
-      <h2>Saved Events</h2>
+      <h2 style={{ marginBottom: 12 }}>Saved Events</h2>
 
-      {/* Grid layout for event cards */}
       <div
+        role="region"
+        aria-label="Saved events"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
-          gap: 16,
-          marginTop: 16,
+          gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+          gap: 12,
+          marginTop: 8,
         }}
       >
-        {/* Map over events array and display each event */}
         {events.map((ev) => (
-          <div
+          <article
             key={ev.id}
+            aria-label={ev.title}
             style={{
-              border: "1px solid #ddd",
-              borderRadius: 8,
+              background: "#141414",
+              border: "1px solid #2b2b2b",
+              borderRadius: 10,
               padding: 12,
-              background: "#fafafa",
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
             }}
           >
-            <h3 style={{ marginBottom: 8 }}>{ev.title}</h3>
+            <Link
+              to={`/events/${ev.id}`}
+              style={{
+                textDecoration: "none",
+                color: "inherit",
+                fontWeight: 700,
+                fontSize: 16,
+              }}
+            >
+              {ev.title}
+            </Link>
 
-            {/* Event description */}
-            <p style={{ fontSize: 14, color: "#555" }}>
+            <p style={{ fontSize: 13, color: "#9aa", margin: 0 }}>
               {ev.description || "No description"}
             </p>
 
-            {/* Location */}
-            <p style={{ fontSize: 12, color: "#777" }}>
-              Location: {ev.location || "N/A"}
-            </p>
+            <div style={{ fontSize: 12, color: "#bbb" }}>
+              <div>
+                <strong>Location:</strong> {ev.location || "N/A"}
+              </div>
+              <div>
+                <strong>Starts:</strong>{" "}
+                {ev.startTime ? new Date(ev.startTime).toLocaleString() : "N/A"}
+              </div>
+            </div>
 
-            {/* Start time */}
-            <p style={{ fontSize: 12, color: "#777" }}>
-              Starts:{" "}
-              {ev.startTime
-                ? new Date(ev.startTime).toLocaleString()
-                : "N/A"}
-            </p>
-          </div>
+            <div style={{ marginTop: "auto", display: "flex", gap: 8 }}>
+              <Link
+                to={`/events/${ev.id}`}
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: 8,
+                  border: "1px solid #2b2b2b",
+                  textDecoration: "none",
+                }}
+              >
+                View
+              </Link>
+
+              {/* Reuse your SaveButton to allow quick Unsave and auto-refresh */}
+              <SaveButton
+                eventId={ev.id}
+                onChange={() => {
+                  // optional: re-fetch to reflect any backend-side changes
+                  // but not necessary because SaveButton emits "saves:changed"
+                }}
+              />
+            </div>
+          </article>
         ))}
       </div>
     </div>
