@@ -118,4 +118,5 @@ Desktop.ini
 
 .vite/deps 
 .vite/*
-client/client/node_modules/
+/src/client/client/node_modules/
+src/client/client/node_modules/*
