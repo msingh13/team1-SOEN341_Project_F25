@@ -2,6 +2,7 @@
   "dependencies": {
     "@types/axios": "^0.9.36",
     "@types/recharts": "^1.8.29",
+    "axios": "^1.13.2",
     "recharts": "^3.3.0"
   }
 }
