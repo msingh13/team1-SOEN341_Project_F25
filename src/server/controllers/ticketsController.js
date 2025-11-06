@@ -55,5 +55,79 @@ async function getMyTickets(req, res) {
     res.status(500).json({ message: "Server error", detail: error.message });
   }
 }
+async function validateTicket(req, res) {
+  try{
+    const user = req.user||{};
+    if(!user||!['organizer', 'admin'].includes(user.role)){
+      return res.status(403).json({message: 'Forbidden: Insufficient permissions'});
+  }
+  if (!user.org_id) {
+    return res.status(400).json({ message: "Organizer must be associated with an organization" });
+  }
+  const token = (req.body && req.body.token)||''.trim();
+  if (!token) {
+    return res.status(400).json({ message: "QR token is required" });
+  }
+  // start a transaction
+await pool.query('BEGIN');
 
-module.exports = { getMyTickets };
+const q = `
+  SELECT
+    t.id, t.user_id, t.event_id, t.qr_token, t.status, t.checked_in_at,
+    e.title AS event_title, e.org_id, e.status AS event_status
+  FROM tickets t
+  JOIN events e ON e.id = t.event_id
+  WHERE t.qr_token = $1
+    AND e.org_id = $2
+    AND e.status IN ('submitted','published')   
+    AND t.status IN ('valid','claimed')         
+  FOR UPDATE
+`;
+
+const { rows } = await pool.query(q, [token, user.org_id]);
+if (rows.length === 0) {
+  await pool.query('ROLLBACK');
+  return res.status(404).json({ message: 'Ticket not found or invalid for this organization' });
+}
+
+const t = rows[0];
+
+
+if (t.checked_in_at) {
+  await pool.query('COMMIT');
+  return res.status(409).json({
+    message: 'Ticket has already been checked in',
+    status: 'Duplicate',
+    ticket: { id: t.id, eventId: t.event_id, checkedInAt: t.checked_in_at },
+  });
+}
+
+
+const upd = await pool.query(
+  `UPDATE tickets
+     SET checked_in_at = NOW()            
+   WHERE id = $1
+   RETURNING checked_in_at`,
+  [t.id] // , user.id
+);
+
+await pool.query('COMMIT');
+return res.status(200).json({
+  message: 'Ticket successfully checked in',
+  status: 'valid',
+  ticket: {
+    id: t.id,
+    eventId: t.event_id,
+    checkedInAt: upd.rows[0].checked_in_at,
+  },
+  event: { id: t.event_id, title: t.event_title },
+});
+
+}catch (error) {
+    await pool.query('ROLLBACK');
+    console.error("Error validating ticket:", error);
+    res.status(500).json({ message: "Server error", detail: error.message });
+  }
+}
+
+module.exports = { getMyTickets, validateTicket };
