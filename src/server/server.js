@@ -41,6 +41,9 @@ app.get("/__health/db", async (_req, res) => {
 });
 
 // --- API Routes ---
+// Dev helpers (e.g., /dev/login returns a JWT for demo)
+app.use("/dev", devRoutes);
+
 // Saves ( /events/:id/save , /me/saves )
 app.use("/", savesRouter);
 
@@ -66,8 +69,6 @@ app.use("/admin", adminRouter);
 app.use("/", adminAnalyticsRouter);
 
 
-// Dev helpers (e.g., /dev/login returns a JWT for demo)
-app.use("/dev", devRoutes);
 
 // --- 404 fallback (keep last) ---
 app.use((_req, res) => {
