@@ -1,28 +1,17 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom'   // ⬅️ add this
-import './index.css'
-import MyTickets from './MyTickets.tsx'
-import "./verify.ts"
-import { StrictMode } from "react";
+import React from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter } from "react-router-dom";
 import "./index.css";
-import App from "./App.tsx";
-import SavedEvents from "./pages/SavedEvents.tsx";
+import App from "./App";
+import { ErrorBoundary } from "./ErrorBoundary";
+
 
 createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <MyTickets />
-  </StrictMode>,
-)
+  <React.StrictMode>
+    <ErrorBoundary>
     <BrowserRouter>
-      <Routes>
-        {/* Main home route */}
-        <Route path="/" element={<App />} />
-        {/* ✅ Dedicated Saved Events page */}
-        <Route path="/saved" element={<SavedEvents />} />
-      </Routes>
+      <App />
     </BrowserRouter>
-  </StrictMode>
+    </ErrorBoundary>
+  </React.StrictMode>
 );
