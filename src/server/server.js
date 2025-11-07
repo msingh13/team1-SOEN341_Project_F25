@@ -1,35 +1,38 @@
-// src/server/server.js
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 
 const pool = require("./db");
 
-// Routers (make sure each of these does: module.exports = router)
+const { authenticateToken } = require("./middleware/auth");
+
+// Routers
 const savesRouter = require("./routes/saves.routes");
 const eventsRouter = require("./routes/events");
-const adminRouter = require("./routes/admin.routes");
+const adminRouter = require("./routes/admin.routes"); // your moderation, etc.
 const ticketClaimRoutes = require("./routes/events.tickets");
 const organizerRoutes = require("./routes/organizer.routes");
 const ticketRoute = require("./routes/ticketRoute");
 const orgEventsRouter = require("./routes/orgEvents");
-const devRoutes = require("./routes/dev.js"); // dev helpers (e.g., /dev/login)
+
+const devRoutes = require("./routes/dev.js");
+const authRoutes = require("./routes/auth.routes");
 const adminOrgsRouter = require("./routes/admin.orgs.routes");
 const adminAnalyticsRouter = require("./routes/admin.analytics.routes");
+
 const app = express();
 
-// CORS + JSON setup
+
+// CORS + JSON
 app.use(
   cors({
     origin: process.env.CORS_ORIGIN || "http://localhost:5173",
     allowedHeaders: ["Content-Type", "Authorization", "X-User-Id"],
-    credentials: false,
   })
 );
 app.use(express.json());
 
-
-// --- Health checks ---
+// Health
 app.get("/health", (_req, res) => res.json({ ok: true }));
 app.get("/__health/db", async (_req, res) => {
   try {
@@ -40,52 +43,29 @@ app.get("/__health/db", async (_req, res) => {
   }
 });
 
-// --- API Routes ---
-// Dev helpers (e.g., /dev/login returns a JWT for demo)
+// Dev & Auth
 app.use("/dev", devRoutes);
+app.use("/auth", authRoutes);
 
-// Saves ( /events/:id/save , /me/saves )
+// Saves, events, tickets, my tickets, org events
 app.use("/", savesRouter);
-
-// Public events (list/detail under /events)
 app.use("/events", eventsRouter);
-
-// Ticket claim endpoint(s) like POST /events/:id/tickets
 app.use("/", ticketClaimRoutes);
-
-// My Tickets + QR validate (needs to be mounted at '/')
-// This exposes GET /me/tickets and (if implemented) POST /org/tickets/validate
 app.use("/", ticketRoute);
+app.use("/api/org/events", orgEventsRouter);
 
-// Organizer routes (e.g., /org/events)
-app.use("/", organizerRoutes);
-
-// Alt organizer events mount (your FE uses /api/org/events)
-// mount routes
-app.use('/me', require('./routes/me'));                 // <-- NEW
-app.use('/api/org/events', require('./routes/orgEvents')); // <-- your existing router (now has GET /)
-// Admin routes
+// Admin (orgs/roles + analytics + moderation)
 app.use("/", adminOrgsRouter);
-app.use("/admin", adminRouter);
 app.use("/", adminAnalyticsRouter);
-app.use("/admin/orgs", require("./routes/adminOrgs"));
+app.use("/admin", adminRouter);
 
+// 404
+app.use((_req, res) => res.status(404).json({ code: "NOT_FOUND", message: "Route not found" }));
 
-
-
-// --- 404 fallback (keep last) ---
-app.use((_req, res) => {
-  res.status(404).json({ code: "NOT_FOUND", message: "Route not found" });
-});
-
-// --- Start server ---
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`🚀 Server running at http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server @ http://localhost:${PORT}`));
 
-// --- DB sanity ping ---
 pool
   .query("SELECT 1")
   .then(() => console.log("✅ DB ping OK"))
   .catch((err) => console.error("❌ DB ping FAILED", err));
-
-module.exports = app;

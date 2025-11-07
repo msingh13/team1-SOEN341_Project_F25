@@ -1,30 +1,51 @@
-// src/server/middleware/auth.js
 const jwt = require("jsonwebtoken");
 
-module.exports = function authenticateToken(req, res, next) {
-  const hdr = req.headers.authorization || "";
-  const m = hdr.match(/^Bearer\s+(.+)$/i);
+function getTokenFrom(req) {
+  const h = req.headers?.authorization || "";
+  if (h.startsWith("Bearer ")) return h.slice(7);
+  return null;
+}
 
-  if (m) {
-    try {
-      const payload = jwt.verify(m[1], process.env.JWT_SECRET || "devsecret");
-      const id = Number(payload.id);
-      if (!Number.isFinite(id)) {
-        return res.status(401).json({ code: "UNAUTHORIZED", message: "Invalid token payload" });
-      }
-      req.user = { id, role: payload.role || "student" };
-      return next();
-    } catch {
-      return res.status(401).json({ code: "UNAUTHORIZED", message: "Invalid token" });
+function authenticateToken(req, res, next) {
+  try {
+    const token = getTokenFrom(req);
+    if (!token) return res.status(401).json({ code: "UNAUTHORIZED", message: "Missing token" });
+    const payload = jwt.verify(token, process.env.JWT_SECRET || "dev-secret");
+    req.user = {
+      id: payload.id,
+      role: payload.role,
+      approved: !!payload.approved,
+      email: payload.email,
+      name: payload.name,
+    };
+    next();
+  } catch (e) {
+    return res.status(401).json({ code: "UNAUTHORIZED", message: "Invalid token" });
+  }
+}
+
+function requireRoles(...roles) {
+  return (req, res, next) => {
+    const role = req.user?.role;
+    if (!role || !roles.includes(role)) {
+      return res.status(403).json({ code: "FORBIDDEN", message: `${roles.join("/")} only` });
     }
-  }
+    next();
+  };
+}
 
-  // DEV fallback: X-User-Id (optional X-User-Role)
-  const devId = req.headers["x-user-id"];
-  if (devId && Number.isFinite(Number(devId))) {
-    req.user = { id: Number(devId), role: (req.headers["x-user-role"] || "student") };
-    return next();
+function requireApproved(req, res, next) {
+  if (!req.user?.approved) {
+    return res.status(403).json({ code: "FORBIDDEN", message: "Account not approved" });
   }
+  next();
+}
 
-  return res.status(401).json({ code: "UNAUTHORIZED", message: "Missing token" });
-};
+const requireAdmin = requireRoles("admin");
+
+// Export in both default and named forms so all imports work
+module.exports = authenticateToken;
+module.exports.authenticateToken = authenticateToken;
+module.exports.requireRoles = requireRoles;
+module.exports.requireApproved = requireApproved;
+module.exports.requireAdmin = requireAdmin;
