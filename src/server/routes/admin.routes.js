@@ -155,4 +155,35 @@ router.post("/events/:id/reject", authenticateToken, requireAdmin, async (req, r
   }
 });
 
+// --- Alias route for frontend: /admin/events/submitted ---
+router.get("/events/submitted", authenticateToken, requireAdmin, async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT e.id, e.title, e.description, e.category, e.start_at, e.status, o.name AS organizer
+         FROM events e
+         LEFT JOIN organizations o ON o.id = e.org_id
+        WHERE e.status = 'submitted'
+        ORDER BY e.start_at ASC NULLS LAST, e.id ASC`
+    );
+
+    const out = rows.map(r => ({
+      id: r.id,
+      title: r.title,
+      description: r.description,
+      category: r.category,
+      organizer: r.organizer,
+      start_at: r.start_at,
+      status: r.status || "submitted",
+    }));
+
+    res.json(out);
+  } catch (err) {
+    console.error("admin list submitted events error", err);
+    res.status(500).json({
+      code: "INTERNAL_ERROR",
+      message: "Failed to load submitted events",
+    });
+  }
+});
+
 module.exports = router;

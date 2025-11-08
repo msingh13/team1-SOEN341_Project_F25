@@ -17,6 +17,7 @@ import Login from "./pages/Login";
 import MyTickets from "./MyTickets";
 import SavedEvents from "./pages/SavedEvents";
 import Scan from "./pages/Scan";
+import AdminHome from "./pages/admin/AdminHome";
 
 // Components
 import Header from "./components/Header";
@@ -146,6 +147,18 @@ export default function App() {
               </RoleRoute>
             }
           />
+          {/* Admin home */}
+          <Route
+            path="/admin"
+            element={
+              <RoleRoute roles={["admin"]}>
+                <AdminHome />
+              </RoleRoute>
+            }
+          />
+
+          {/* TEMP: bypass guard to test admin page renders */}
+          <Route path="/__admin_raw" element={<AdminHome />} />
 
           {/* 404 */}
           <Route path="*" element={<div className="container">Not Found</div>} />
