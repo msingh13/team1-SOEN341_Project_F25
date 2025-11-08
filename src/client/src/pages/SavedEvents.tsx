@@ -36,7 +36,7 @@ export default function SavedEvents() {
     setError(null);
     try {
       const data = await listMySaves();
-      const items: SavedEventWire[] = data.items || [];
+      const items: SavedEventWire[] = Array.isArray(data) ? data : (data.items || []);
       // normalize keys to camelCase for UI
       const normalized: EventItem[] = items.map((e) => ({
         id: e.id,

@@ -282,4 +282,70 @@ router.get('/:id/attendees.csv', authenticateToken, async (req, res) => {
   }
 });
 
+/* =========================================================
+ *  ANALYTICS  (matches client path /api/org/events/:id/analytics)
+ *  GET /:id/analytics
+ *  - Ownership check (organizer must own the event)
+ *  - Returns issued, checked-in, remaining, attendance rate
+ * ======================================================= */
+router.get('/:id/analytics', authenticateToken, async (req, res) => {
+  const userId = req.user?.id;
+  const eventId = Number(req.params.id);
+  if (!Number.isFinite(eventId)) {
+    return sendError(res, 400, 'BAD_REQUEST', 'Invalid event id');
+  }
+
+  try {
+    // Verify the requester owns this event via organizers table
+    const own = await pool.query(
+      `
+      SELECT e.id
+        FROM events e
+        JOIN organizers o ON o.id = e.org_id OR o.org_id = e.org_id
+       WHERE e.id = $1 AND o.user_id = $2
+       LIMIT 1
+      `,
+      [eventId, userId]
+    );
+    if (own.rowCount === 0) {
+      return sendError(res, 403, 'FORBIDDEN', 'Not your event');
+    }
+
+    // Aggregate ticket stats
+    const { rows } = await pool.query(
+      `
+      SELECT
+        e.id,
+        COALESCE(e.capacity, 0)                                                AS capacity,
+        COALESCE(SUM(CASE WHEN t.id IS NOT NULL THEN 1 ELSE 0 END), 0)::int    AS tickets_issued,
+        COALESCE(SUM(CASE WHEN t.status = 'checked_in' THEN 1 ELSE 0 END), 0)::int AS tickets_checked_in
+      FROM events e
+      LEFT JOIN tickets t ON t.event_id = e.id
+      WHERE e.id = $1
+      GROUP BY e.id, e.capacity
+      `,
+      [eventId]
+    );
+
+    if (!rows.length) {
+      return sendError(res, 404, 'NOT_FOUND', 'Event not found');
+    }
+
+    const r = rows[0];
+    const remaining_capacity = Math.max(r.capacity - r.tickets_issued, 0);
+    const attendance_rate =
+      r.tickets_issued === 0 ? 0 : Math.round((r.tickets_checked_in / r.tickets_issued) * 100);
+
+    return res.json({
+      tickets_issued: r.tickets_issued,
+      tickets_checked_in: r.tickets_checked_in,
+      remaining_capacity,
+      attendance_rate,
+    });
+  } catch (err) {
+    console.error('orgEvents analytics error', err);
+    return sendError(res, 500, 'INTERNAL_ERROR', 'Failed to load analytics', err.message);
+  }
+});
+
 module.exports = router;
