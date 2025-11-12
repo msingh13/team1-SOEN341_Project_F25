@@ -6,6 +6,15 @@
 
 import { useEffect, useState } from "react";
 
+// Always normalize API responses to an array
+function toArray(x: any): any[] {
+  if (Array.isArray(x)) return x;
+  if (x && Array.isArray(x.data)) return x.data;
+  if (x && Array.isArray(x.items)) return x.items;
+  if (x && Array.isArray(x.events)) return x.events;
+  return [];
+}
+
 type ModerationStatus = "submitted" | "published" | "rejected";
 
 type ModerationEvent = {
@@ -33,10 +42,11 @@ export default function AdminModeration() {
          try {
            const API = import.meta.env.VITE_API_URL || "http://localhost:4000";
            const res = await fetch(`${API}/admin/events/submitted`, {
-             headers: { Authorization: `Bearer ${localStorage.getItem("token") ?? ""}` }
+            headers: { Authorization: `Bearer ${localStorage.getItem("token") ?? ""}` }
            });
-           const list = await res.json();
-           setEvents(list);
+           const text = await res.text();
+           const data = text ? JSON.parse(text) : null;
+           setEvents(toArray(data));
          } catch (e) {
            setError("Failed to load submitted events");
          }

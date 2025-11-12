@@ -6,7 +6,6 @@ type Wire = {
   id: number;
   title: string;
   location?: string;
-  // server may send either shape; support both
   startAt?: string;      // camel
   start_time?: string;   // snake
   capacity?: number;
@@ -33,7 +32,6 @@ export default function OrganizerEvents() {
   const [err, setErr] = useState<string | null>(null);
   const [sort, setSort] = useState<"start_asc" | "start_desc">("start_asc");
   const nav = useNavigate();
-
   const token = localStorage.getItem("token") || "";
 
   function normalize(list: Wire[]): Row[] {
@@ -43,8 +41,7 @@ export default function OrganizerEvents() {
       startAt: e.startAt ?? e.start_time ?? null,
       location: e.location ?? "",
       capacity: e.capacity ?? null,
-      remaining:
-        e.remaining ?? e.remaining_seats ?? (e.capacity != null ? e.capacity : null),
+      remaining: e.remaining ?? e.remaining_seats ?? (e.capacity != null ? e.capacity : null),
       status: e.status ?? "",
     }));
   }
@@ -53,7 +50,7 @@ export default function OrganizerEvents() {
     const res = await fetch(url, {
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`, // IMPORTANT
+        Authorization: `Bearer ${token}`,
       },
     });
     const text = await res.text();
@@ -67,43 +64,49 @@ export default function OrganizerEvents() {
     return data;
   }
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setErr(null);
+useEffect(() => {
+  let cancelled = false;
+  (async () => {
+    setLoading(true);
+    setErr(null);
+    try {
+      let out: Row[] | null = null;
+
+      // 1) Try the primary route
       try {
-        // Try your original “me” route first
-        let data = await fetchSafely(`${API_URL}/me/events`);
-        // Some servers wrap the list; accept arrays or {data:[]}
+        const data = await fetchSafely(`${API_URL}/me/events`);
         const list: Wire[] = Array.isArray(data) ? data : data?.data ?? [];
-        let out = normalize(list);
-
-        // Fallback if list is empty or API not present
-        if (!out.length) {
-          try {
-            const alt = await fetchSafely(`${API_URL}/api/org/events?mine=1`);
-            const list2: Wire[] = Array.isArray(alt) ? alt : alt?.data ?? [];
-            out = normalize(list2);
-          } catch (e) {
-            // swallow fallback errors; we’ll use the primary error if any
-          }
-        }
-
-        if (!cancelled) setRows(out);
-      } catch (e: any) {
-        if (!cancelled) {
-          // Make common auth messages clearer
-          if (e?.status === 401) setErr("Unauthorized — please log in as an organizer.");
-          else if (e?.status === 403) setErr(e?.code === "FORBIDDEN" ? "Forbidden — organizer role required." : e.message || "Forbidden.");
-          else setErr(e?.message || "Failed to load events.");
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
+        out = normalize(list);
+      } catch (_e) {
+        // swallow — we'll try fallback below
       }
-    })();
-    return () => { cancelled = true; };
-  }, [token]);
+
+      // 2) Fallback if primary failed or came back empty
+      if (!out || out.length === 0) {
+        try {
+          const alt = await fetchSafely(`${API_URL}/api/org/events?mine=1`);
+          const list2: Wire[] = Array.isArray(alt) ? alt : alt?.data ?? [];
+          out = normalize(list2);
+        } catch (e) {
+          // If even fallback fails, rethrow to surface the error
+          throw e;
+        }
+      }
+
+      if (!cancelled) setRows(out || []);
+    } catch (e: any) {
+      if (!cancelled) {
+        if (e?.status === 401) setErr("Unauthorized — please log in as an organizer.");
+        else if (e?.status === 403) setErr(e?.code === "FORBIDDEN" ? "Forbidden — organizer role required." : e.message || "Forbidden.");
+        else setErr(e?.message || "Failed to load events.");
+      }
+    } finally {
+      if (!cancelled) setLoading(false);
+    }
+  })();
+  return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [token]);
 
   const sorted = useMemo(() => {
     const arr = [...rows];
