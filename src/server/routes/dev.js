@@ -16,20 +16,29 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ code: "BAD_REQUEST", message: "Invalid role" });
     }
 
-    // Upsert a user so FKs work
-    try {
-      await pool.query(
-        `INSERT INTO users (id, name, email, role)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (id) DO UPDATE SET role = EXCLUDED.role`,
-        [id, `User ${id}`, `user${id}@example.com`, role]
-      );
-    } catch (e) {
-      console.warn("dev/login: user upsert warning:", e.message);
-      // don't fail login if seed table shape differs – you just won’t have FK protection
-    }
+    // Upsert a user so FKs work. Provide a dummy password_hash to satisfy NOT NULL.
+    // On conflict, don't touch password_hash; just ensure role/approved are correct.
+    await pool.query(
+      `INSERT INTO users (id, name, email, role, password_hash, approved)
+       VALUES ($1, $2, $3, $4, '', TRUE)
+       ON CONFLICT (id) DO UPDATE
+         SET role = EXCLUDED.role,
+             approved = TRUE`,
+      [id, `User ${id}`, `user${id}@example.com`, role]
+    );
 
-    const token = jwt.sign({ id, role }, process.env.JWT_SECRET || "devsecret", { expiresIn: "4h" });
+    const secret = process.env.JWT_SECRET || "devsecret";
+    const token = jwt.sign(
+      {
+        id,
+        role,
+        approved: true, // ensure student actions (save/claim) are allowed
+        email: `user${id}@example.com`,
+        name: `User ${id}`,
+      },
+      secret,
+      { expiresIn: "4h" }
+    );
     return res.json({ token });
   } catch (e) {
     console.error("dev/login failed", e);

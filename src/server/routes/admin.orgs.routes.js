@@ -58,6 +58,141 @@ router.delete("/admin/orgs/:id", authenticateToken, requireRoles("admin"), async
   res.json({ ok: true });
 });
 
+// --- ALIASES so the frontend can call /admin/organizations too ---
+
+// GET /admin/organizations  (alias of /admin/orgs)
+router.get("/admin/organizations", authenticateToken, requireRoles("admin"), async (_req, res) => {
+  const { rows } = await pool.query(
+    `SELECT id, name, description, created_at
+       FROM organizations
+      ORDER BY id`
+  );
+  res.json(rows);
+});
+
+// POST /admin/organizations
+router.post("/admin/organizations", authenticateToken, requireRoles("admin"), async (req, res) => {
+  const { name, description } = req.body || {};
+  if (!name) return res.status(400).json({ code: "BAD_REQUEST", message: "Missing name" });
+
+  const { rows } = await pool.query(
+    `INSERT INTO organizations (name, description)
+     VALUES ($1,$2)
+     RETURNING id, name, description`,
+    [name, description || null]
+  );
+  res.status(201).json(rows[0]);
+});
+
+// PUT /admin/organizations/:id
+router.put("/admin/organizations/:id", authenticateToken, requireRoles("admin"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ code: "BAD_REQUEST", message: "Invalid id" });
+
+  const { name, description } = req.body || {};
+  const { rows } = await pool.query(
+    `UPDATE organizations
+        SET name = COALESCE($2, name),
+            description = COALESCE($3, description),
+            updated_at = NOW()
+      WHERE id = $1
+    RETURNING id, name, description`,
+    [id, name ?? null, description ?? null]
+  );
+  if (!rows.length) return res.status(404).json({ code: "NOT_FOUND", message: "Org not found" });
+  res.json(rows[0]);
+});
+
+// DELETE /admin/organizations/:id
+router.delete("/admin/organizations/:id", authenticateToken, requireRoles("admin"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ code: "BAD_REQUEST", message: "Invalid id" });
+
+  await pool.query(`DELETE FROM organizations WHERE id = $1`, [id]);
+  res.json({ ok: true });
+});
+
+// --- API-PREFIX ALIASES so frontend calling /api/admin/... works too ---
+
+// GET /api/admin/organizations
+router.get("/api/admin/organizations", authenticateToken, requireRoles("admin"), async (_req, res) => {
+  const { rows } = await pool.query(
+    `SELECT id, name, description, created_at
+       FROM organizations
+      ORDER BY id`
+  );
+  res.json(rows);
+});
+
+// POST /api/admin/organizations
+router.post("/api/admin/organizations", authenticateToken, requireRoles("admin"), async (req, res) => {
+  const { name, description } = req.body || {};
+  if (!name) return res.status(400).json({ code: "BAD_REQUEST", message: "Missing name" });
+
+  const { rows } = await pool.query(
+    `INSERT INTO organizations (name, description)
+     VALUES ($1,$2)
+     RETURNING id, name, description`,
+    [name, description || null]
+  );
+  res.status(201).json(rows[0]);
+});
+
+// PUT /api/admin/organizations/:id
+router.put("/api/admin/organizations/:id", authenticateToken, requireRoles("admin"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ code: "BAD_REQUEST", message: "Invalid id" });
+
+  const { name, description } = req.body || {};
+  const { rows } = await pool.query(
+    `UPDATE organizations
+        SET name = COALESCE($2, name),
+            description = COALESCE($3, description),
+            updated_at = NOW()
+      WHERE id = $1
+    RETURNING id, name, description`,
+    [id, name ?? null, description ?? null]
+  );
+  if (!rows.length) return res.status(404).json({ code: "NOT_FOUND", message: "Org not found" });
+  res.json(rows[0]);
+});
+
+// DELETE /api/admin/organizations/:id
+router.delete("/api/admin/organizations/:id", authenticateToken, requireRoles("admin"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ code: "BAD_REQUEST", message: "Invalid id" });
+
+  await pool.query(`DELETE FROM organizations WHERE id = $1`, [id]);
+  res.json({ ok: true });
+});
+
+// API-prefix aliases for roles as well:
+
+router.post("/api/admin/orgs/:id/roles", authenticateToken, requireRoles("admin"), async (req, res) => {
+  const orgId = Number(req.params.id);
+  const { user_id, role } = req.body || {};
+  if (!Number.isFinite(orgId) || !user_id || !role) {
+    return res.status(400).json({ code: "BAD_REQUEST", message: "Missing/invalid org_id or user_id/role" });
+  }
+  await pool.query(
+    `INSERT INTO user_org_roles (org_id, user_id, role)
+     VALUES ($1,$2,$3)
+     ON CONFLICT (org_id, user_id) DO UPDATE SET role = EXCLUDED.role`,
+    [orgId, Number(user_id), role]
+  );
+  res.json({ ok: true });
+});
+
+router.delete("/api/admin/orgs/:id/roles/:userId", authenticateToken, requireRoles("admin"), async (req, res) => {
+  const orgId = Number(req.params.id);
+  const userId = Number(req.params.userId);
+  if (!Number.isFinite(orgId) || !Number.isFinite(userId)) {
+    return res.status(400).json({ code: "BAD_REQUEST", message: "Invalid id(s)" });
+  }
+  await pool.query(`DELETE FROM user_org_roles WHERE org_id = $1 AND user_id = $2`, [orgId, userId]);
+  res.json({ ok: true });
+});
+
 /* --------- Assign/Remove roles in org --------- */
 
 router.post("/admin/orgs/:id/roles", authenticateToken, requireRoles("admin"), async (req, res) => {
@@ -160,6 +295,78 @@ router.post("/admin/organizers/:requestId/reject", authenticateToken, requireRol
     [requestId]
   );
   if (!r.rowCount) return res.status(404).json({ code: "NOT_FOUND", message: "Request not found" });
+  res.json({ ok: true });
+});
+
+// ====== /api/admin/orgs (aliases for the same handlers) ======
+router.get("/api/admin/orgs", authenticateToken, requireRoles("admin"), async (_req, res) => {
+  const { rows } = await pool.query(
+    `SELECT id, name, description, created_at
+       FROM organizations
+      ORDER BY id`
+  );
+  res.json(rows);
+});
+
+router.post("/api/admin/orgs", authenticateToken, requireRoles("admin"), async (req, res) => {
+  const { name, description } = req.body || {};
+  if (!name) return res.status(400).json({ code: "BAD_REQUEST", message: "Missing name" });
+  const { rows } = await pool.query(
+    `INSERT INTO organizations (name, description)
+     VALUES ($1,$2)
+     RETURNING id, name, description`,
+    [name, description || null]
+  );
+  res.status(201).json(rows[0]);
+});
+
+router.put("/api/admin/orgs/:id", authenticateToken, requireRoles("admin"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ code: "BAD_REQUEST", message: "Invalid id" });
+  const { name, description } = req.body || {};
+  const { rows } = await pool.query(
+    `UPDATE organizations
+        SET name = COALESCE($2, name),
+            description = COALESCE($3, description),
+            updated_at = NOW()
+      WHERE id = $1
+    RETURNING id, name, description`,
+    [id, name ?? null, description ?? null]
+  );
+  if (!rows.length) return res.status(404).json({ code: "NOT_FOUND", message: "Org not found" });
+  res.json(rows[0]);
+});
+
+router.delete("/api/admin/orgs/:id", authenticateToken, requireRoles("admin"), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ code: "BAD_REQUEST", message: "Invalid id" });
+  await pool.query(`DELETE FROM organizations WHERE id = $1`, [id]);
+  res.json({ ok: true });
+});
+
+// roles on /api/admin/orgs as well
+router.post("/api/admin/orgs/:id/roles", authenticateToken, requireRoles("admin"), async (req, res) => {
+  const orgId = Number(req.params.id);
+  const { user_id, role } = req.body || {};
+  if (!Number.isFinite(orgId) || !user_id || !role) {
+    return res.status(400).json({ code: "BAD_REQUEST", message: "Missing/invalid org_id or user_id/role" });
+  }
+  await pool.query(
+    `INSERT INTO user_org_roles (org_id, user_id, role)
+     VALUES ($1,$2,$3)
+     ON CONFLICT (org_id, user_id) DO UPDATE SET role = EXCLUDED.role`,
+    [orgId, Number(user_id), role]
+  );
+  res.json({ ok: true });
+});
+
+router.delete("/api/admin/orgs/:id/roles/:userId", authenticateToken, requireRoles("admin"), async (req, res) => {
+  const orgId = Number(req.params.id);
+  const userId = Number(req.params.userId);
+  if (!Number.isFinite(orgId) || !Number.isFinite(userId)) {
+    return res.status(400).json({ code: "BAD_REQUEST", message: "Invalid id(s)" });
+  }
+  await pool.query(`DELETE FROM user_org_roles WHERE org_id = $1 AND user_id = $2`, [orgId, userId]);
   res.json({ ok: true });
 });
 

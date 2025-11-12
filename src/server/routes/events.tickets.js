@@ -183,4 +183,60 @@ router.post(
   }
 );
 
+// Alias so the client path /tickets/validate works too
+router.post(
+  "/tickets/validate",
+  authenticateToken,
+  requireOrganizerOrAdmin,
+  async (req, res) => {
+    const { token } = req.body || {};
+    if (!token || typeof token !== "string") {
+      return res.status(400).json({ code: "BAD_REQUEST", message: "Missing QR token" });
+    }
+
+    try {
+      const { rows } = await pool.query(
+        `SELECT id, status, event_id, user_id, checked_in_at FROM tickets WHERE qr_token = $1`,
+        [token]
+      );
+      const t = rows[0];
+      if (!t) return res.status(400).json({ code: "INVALID", message: "Invalid QR" });
+
+      if (t.status === "checked_in" || t.checked_in_at) {
+        return res.json({
+          ok: false,
+          status: "duplicate",
+          message: "Already checked in",
+          ticket: { id: t.id, eventId: t.event_id },
+        });
+      }
+
+      const { rows: up } = await pool.query(
+        `UPDATE tickets
+            SET status = 'checked_in', checked_in_at = NOW()
+          WHERE id = $1
+        RETURNING id, event_id, user_id, checked_in_at`,
+        [t.id]
+      );
+      const checked = up[0];
+
+      const { rows: userRows } = await pool.query(
+        `SELECT id, name, email FROM users WHERE id = $1`,
+        [checked.user_id]
+      );
+      const attendee = userRows[0] || { id: checked.user_id };
+
+      return res.json({
+        ok: true,
+        status: "valid",
+        attendee,
+        ticket: { id: checked.id, eventId: checked.event_id, checkedInAt: checked.checked_in_at },
+      });
+    } catch (err) {
+      console.error("POST /tickets/validate error:", err);
+      return res.status(500).json({ code: "INTERNAL_ERROR", message: "Server error" });
+    }
+  }
+);
+
 module.exports = router;
