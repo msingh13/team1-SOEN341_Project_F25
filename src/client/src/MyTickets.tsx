@@ -1,31 +1,45 @@
 import { useEffect, useState } from "react";
 
-type TicketRow = {
-  ticket_id: number;
-  event_id: number;
-  qr_token: string;
+type TicketVM = {
+  id: number;
   status: string;
-  issued_at: string | null;
-  checked_in_at: string | null;
+  qrToken: string;
+  issuedAt?: string | null;
+  checkedInAt?: string | null;
   title: string;
-  start_at: string;
-  location: string;
+  startAt?: string | null;
+  location?: string | null;
 };
 
 export default function MyTickets() {
-  const [tickets, setTickets] = useState<TicketRow[]>([]);
+  const [tickets, setTickets] = useState<TicketVM[]>([]);
   const [loading, setLoading] = useState(true);
   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
 
   useEffect(() => {
     async function load() {
+      setLoading(true);
       try {
         const token = localStorage.getItem("token");
         const res = await fetch(`${API_URL}/me/tickets`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
-        const data: TicketRow[] = await res.json();
-        setTickets(Array.isArray(data) ? data : []);
+        const data = await res.json();
+
+        // Backend returns: { Tickets: [{ id, status, qrCode, issuedAt, checkedInAt, ev:{title}, event:{startAt,endAt,location} }]}
+        const arr = Array.isArray(data) ? data : (data?.Tickets ?? []);
+        const mapped: TicketVM[] = arr.map((t: any) => ({
+          id: t.id ?? t.ticket_id,
+          status: t.status,
+          qrToken: t.qrCode ?? t.qr_token ?? "",
+          issuedAt: t.issuedAt ?? t.issued_at ?? null,
+          checkedInAt: t.checkedInAt ?? t.checked_in_at ?? null,
+          title: t.ev?.title ?? t.event_title ?? "Event",
+          startAt: t.event?.startAt ?? t.start_at ?? null,
+          location: t.event?.location ?? t.location ?? null,
+        }));
+
+        setTickets(mapped);
       } catch {
         setTickets([]);
       } finally {
@@ -35,22 +49,26 @@ export default function MyTickets() {
     load();
   }, [API_URL]);
 
-  if (loading) return <p>Loading your tickets…</p>;
-  if (!tickets.length) return <p>No tickets yet.</p>;
+  if (loading) return <p style={{ padding: 20 }}>Loading your tickets…</p>;
+  if (!tickets.length) return <p style={{ padding: 20 }}>No tickets yet.</p>;
 
   return (
     <div style={{ padding: 20 }}>
       <h2>My Tickets</h2>
       <div style={{ display: "grid", gap: 12 }}>
         {tickets.map((t) => (
-          <article key={t.ticket_id} style={{ background: "#141414", padding: 16, borderRadius: 10 }}>
-           <h3>{(t as any).title || (t as any).event_title || "Event"}</h3>
-            <p>{new Date((t as any).start_at || (t as any).issued_at).toLocaleString()}</p>
-            <p>{(t as any).location || ""}</p>
-            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(
-                  (t as any).qr_token || (t as any).qrCode || ""
-              )}`} alt="QR Code" />
-            <p>Status: {t.status}{t.checked_in_at ? " (checked in)" : ""}</p>
+          <article key={t.id} style={{ background: "#141414", padding: 16, borderRadius: 10 }}>
+            <h3>{t.title}</h3>
+            <p>{t.startAt ? new Date(t.startAt).toLocaleString() : (t.issuedAt ? new Date(t.issuedAt).toLocaleString() : "N/A")}</p>
+            <p>{t.location || ""}</p>
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(t.qrToken)}`}
+              alt="QR Code"
+            />
+            <p>
+              Status: {t.status}
+              {t.checkedInAt ? " (checked in)" : ""}
+            </p>
           </article>
         ))}
       </div>

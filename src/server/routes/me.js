@@ -1,49 +1,59 @@
-const express = require("express");
+// src/server/routes/me.js
+const express = require('express');
 const router = express.Router();
-const pool = require("../db");
+const pool = require('../db');
+const authenticateToken = require('../middleware/auth');
+const { ensureRole } = require('../middleware/roles');
 
-function currentUserId(req) {
-  return Number(req.header("x-user-id") || 0) || 0;
-}
-
-// GET /me/saves
-router.get("/saves", async (req, res) => {
-  const uid = currentUserId(req);
-  if (!uid) return res.status(401).json({ message: "No user" });
-
+// GET /me/events  → events owned by the current organizer/admin
+router.get('/events', authenticateToken, ensureRole('organizer', 'admin'), async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      `SELECT e.id, e.title, e.description, e.category, e.organizer, e.location, e.start_time, e.end_time
-       FROM saves s
-       JOIN events e ON e.id = s.event_id
-       WHERE s.user_id = $1
-       ORDER BY e.start_time ASC`,
-      [uid]
-    );
-    res.json({ items: rows });
-  } catch (e) {
-    res.status(500).json({ message: e.message });
-  }
-});
+    const userId = req.user.id;
 
-// GET /me/tickets
-router.get("/tickets", async (req, res) => {
-  const uid = currentUserId(req);
-  if (!uid) return res.status(401).json({ message: "No user" });
+    // Find organizer row for this user
+    const org = await pool.query(`SELECT id FROM organizers WHERE user_id = $1`, [userId]);
+    if (org.rowCount === 0 && req.user.role !== 'admin') {
+      return res.status(403).json({ code: "FORBIDDEN", message: "Organizer role required" });
+    }
 
-  try {
-    const { rows } = await pool.query(
-      `SELECT t.id, t.status, t.qr_code,
-              e.id AS event_id, e.title AS event_title, e.location AS event_location, e.start_time AS event_start_at
-       FROM tickets t
-       JOIN events e ON e.id = t.event_id
-       WHERE t.user_id = $1
-       ORDER BY t.claimed_at DESC`,
-      [uid]
-    );
-    res.json({ tickets: rows });
-  } catch (e) {
-    res.status(500).json({ message: e.message });
+    // If admin without organizer record, show everything, else filter by org_id
+    const isAdminNoOrg = req.user.role === 'admin' && org.rowCount === 0;
+
+    const q = isAdminNoOrg
+      ? `
+        SELECT id, org_id, title, description, category,
+               start_at, end_at, location, capacity, ticket_type, status
+          FROM events
+         ORDER BY COALESCE(start_at, now()) ASC, id ASC
+        `
+      : `
+        SELECT e.id, e.org_id, e.title, e.description, e.category,
+               e.start_at, e.end_at, e.location, e.capacity, e.ticket_type, e.status
+          FROM events e
+          JOIN organizers o ON o.id = e.org_id
+         WHERE o.user_id = $1
+         ORDER BY COALESCE(e.start_at, now()) ASC, e.id ASC
+        `;
+
+    const params = isAdminNoOrg ? [] : [userId];
+    const { rows } = await pool.query(q, params);
+
+    // Return keys friendly to the frontend (both snake and camel are okay)
+    const data = rows.map(r => ({
+      id: r.id,
+      title: r.title,
+      location: r.location,
+      start_time: r.start_at,
+      end_time: r.end_at,
+      capacity: r.capacity,
+      ticket_type: r.ticket_type,
+      status: r.status,
+    }));
+
+    res.json({ data });
+  } catch (err) {
+    console.error('GET /me/events error', err);
+    res.status(500).json({ code: "INTERNAL_ERROR", message: "Server error" });
   }
 });
 

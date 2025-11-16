@@ -1,22 +1,59 @@
-const express = require('express');
-const db = require('../db');
-const auth = require('../middleware/auth');
-const requireAdmin = require('../middleware/requireAdmin');
+const express = require("express");
 const router = express.Router();
+const pool = require("../db");
+const { authenticateToken, requireRoles } = require("../middleware/auth");
 
-router.use(auth, requireAdmin);
+/**
+ * GET /admin/stats
+ * returns { total_events, total_tickets, total_users, issued_today, by_day:[{day,issued}], participation_rate }
+ */
+router.get("/admin/stats", authenticateToken, requireRoles("admin"), async (_req, res) => {
+  try {
+    const [{ rows: a }, { rows: b }, { rows: c }, { rows: d }] = await Promise.all([
+      pool.query(`SELECT COUNT(*)::int AS total_events FROM events`),
+      pool.query(`SELECT COUNT(*)::int AS total_tickets FROM tickets`),
+      pool.query(`SELECT COUNT(*)::int AS total_users FROM users`),
+      pool.query(`
+        SELECT to_char(date_trunc('day', issued_at), 'YYYY-MM-DD') AS day,
+               COUNT(*)::int AS issued
+        FROM tickets
+        WHERE issued_at IS NOT NULL
+        GROUP BY 1
+        ORDER BY 1
+      `),
+    ]);
 
-router.get('/admin/analytics', async (_req, res) => {
-  const [{ rows: e }, { rows: t }, { rows: ci }] = await Promise.all([
-    db.query(`SELECT COUNT(*)::int AS c FROM events`),
-    db.query(`SELECT COUNT(*)::int AS c FROM tickets`),
-    db.query(`SELECT COUNT(*)::int AS c FROM tickets WHERE status='checked_in'`),
-  ]);
-  res.json({
-    events: e[0].c,
-    ticketsIssued: t[0].c,
-    participationRate: t[0].c ? Math.round((ci[0].c / t[0].c) * 100) : 0
-  });
+    const issuedTodayRes = await pool.query(
+      `SELECT COUNT(*)::int AS issued_today
+       FROM tickets WHERE issued_at::date = CURRENT_DATE`
+    );
+    const issuedToday = issuedTodayRes.rows[0]?.issued_today ?? 0;
+
+    // participation rate = avg( checked_in / issued ) across events (simple heuristic)
+    const pr = await pool.query(`
+      SELECT AVG(CASE WHEN issued_cnt>0 THEN checked_cnt::numeric/issued_cnt ELSE 0 END) AS rate
+      FROM (
+        SELECT event_id,
+               COUNT(*) FILTER (WHERE issued_at IS NOT NULL) AS issued_cnt,
+               COUNT(*) FILTER (WHERE checked_in_at IS NOT NULL) AS checked_cnt
+        FROM tickets
+        GROUP BY event_id
+      ) s
+    `);
+    const participation_rate = Math.round((Number(pr.rows[0]?.rate || 0) * 100));
+
+    res.json({
+      total_events: a[0].total_events,
+      total_tickets: b[0].total_tickets,
+      total_users: c[0].total_users,
+      issued_today: issuedToday,
+      by_day: d,
+      participation_rate,
+    });
+  } catch (e) {
+    console.error("stats error", e);
+    res.status(500).json({ code: "INTERNAL_ERROR", message: "Server error" });
+  }
 });
 
 module.exports = router;
