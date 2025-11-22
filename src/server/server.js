@@ -14,6 +14,8 @@ const ticketClaimRoutes = require("./routes/events.tickets");
 const organizerRoutes = require("./routes/organizer.routes");
 const ticketRoute = require("./routes/ticketRoute");
 const orgEventsRouter = require("./routes/orgEvents");
+const offersRoutes = require("./routes/offers");
+
 
 const devRoutes = require("./routes/dev.js");
 const authRoutes = require("./routes/auth.routes");
@@ -62,6 +64,10 @@ app.use("/api/org/events", orgEventsRouter);
 app.use("/", adminOrgsRouter);
 app.use("/", adminAnalyticsRouter);
 app.use("/admin", adminRouter);
+
+// offers
+app.use("/offers", offersRoutes);
+
 
 // 404
 app.use((_req, res) => res.status(404).json({ code: "NOT_FOUND", message: "Route not found" }));
