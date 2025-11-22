@@ -20,6 +20,9 @@ const authRoutes = require("./routes/auth.routes");
 const adminOrgsRouter = require("./routes/admin.orgs.routes");
 const adminAnalyticsRouter = require("./routes/admin.analytics.routes");
 
+const waitlistRoutes = require("./routes/events.waitlist.routes");
+
+
 const app = express();
 
 
@@ -50,6 +53,7 @@ app.use("/auth", authRoutes);
 // Saves, events, tickets, my tickets, org events
 app.use("/", savesRouter);
 app.use("/events", eventsRouter);
+app.use("/", waitlistRoutes);
 app.use("/", ticketClaimRoutes);
 app.use("/", ticketRoute);
 app.use("/api/org/events", orgEventsRouter);
