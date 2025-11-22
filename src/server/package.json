@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
+    "waitlist:run": "node workers/run-waitlist-jobs.js",
     "test:smoke": "node ../../tests/smoke.cjs"
   },
   "keywords": [],
