@@ -23,6 +23,7 @@ const adminAnalyticsRouter = require("./routes/admin.analytics.routes");
 
 // ✅ TON WAITLIST ENDPOINT (correct)
 const waitlistRoutes = require("./routes/events.waitlist.routes");
+const adminWaitlistRoutes = require("./routes/admin.waitlist.routes");
 
 const app = express();
 
@@ -65,6 +66,8 @@ app.use("/api/org/events", orgEventsRouter);
 app.use("/", adminOrgsRouter);
 app.use("/", adminAnalyticsRouter);
 app.use("/admin", adminRouter);
+app.use("/admin/waitlist", adminWaitlistRoutes);
+
 
 // Offers
 app.use("/offers", offersRoutes);
