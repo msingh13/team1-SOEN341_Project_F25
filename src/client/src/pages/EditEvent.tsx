@@ -12,13 +12,20 @@ interface EditEventProps {
 
 interface EventWire {
   id: string;
+  org_id?: number;
   title: string;
   description?: string | null;
-  start_time?: string | null; // public GET uses start_time / end_time
-  end_time?: string | null;
+  category?: string | null;
+  start_at?: string | null; // public GET uses start_time / end_time
+  end_at?: string | null;
   location?: string | null;
   capacity?: number | null;
   ticket_type?: TicketType | null;
+  status?: string | null;
+
+  waitlist_enabled?: boolean | null;
+  waitlist_offer_window?: number | null;
+  waitlist_queue_cap?: number | null;
 }
 
 interface FormState {
@@ -30,6 +37,10 @@ interface FormState {
   location: string;
   capacity: string;
   ticketType: TicketType;
+
+  waitlistEnabled: boolean;
+  waitlistOfferWindow: string;
+  waitlistQueueCap: string;
 }
 
 type Toast = { type: "success" | "error"; msg: string } | null;
@@ -81,6 +92,10 @@ export default function EditEvent(props: EditEventProps): JSX.Element {
     location: "",
     capacity: "",
     ticketType: "free",
+
+    waitlistEnabled: false,
+    waitlistOfferWindow: "",
+    waitlistQueueCap: "",
   });
 
   const [loading, setLoading] = useState<boolean>(true);
@@ -101,15 +116,16 @@ export default function EditEvent(props: EditEventProps): JSX.Element {
       setErr(null);
 
       try {
-        const res = await axios.get<EventWire>(`${BASE_URL}/events/${eventId}`, {
+        const res = await axios.get<EventWire>(`${BASE_URL}/api/org/events/${eventId}`, {
           headers: {
-            // Public endpoint in your app, token not required — but sending is fine:
             Authorization: `Bearer ${localStorage.getItem("token") ?? ""}`,
           },
         });
         const ev = res.data;
-        const start = isoToParts(ev.start_time ?? null);
-        const end = isoToParts(ev.end_time ?? null);
+
+        // note: org API uses start_at / end_at
+        const start = isoToParts(ev.start_at ?? null);
+        const end = isoToParts(ev.end_at ?? null);
 
         if (!cancel) {
           setForm({
@@ -121,6 +137,14 @@ export default function EditEvent(props: EditEventProps): JSX.Element {
             location: ev.location || "",
             capacity: String(ev.capacity ?? ""),
             ticketType: (ev.ticket_type as TicketType) || "free",
+
+            waitlistEnabled: Boolean(ev.waitlist_enabled),
+            waitlistOfferWindow: ev.waitlist_offer_window
+              ? String(ev.waitlist_offer_window)
+              : "",
+            waitlistQueueCap: ev.waitlist_queue_cap
+              ? String(ev.waitlist_queue_cap)
+              : "",
           });
         }
       } catch (e: unknown) {
@@ -167,6 +191,12 @@ export default function EditEvent(props: EditEventProps): JSX.Element {
         location: form.location || null,
         capacity: Number(form.capacity || 0),
         ticket_type: form.ticketType,
+
+        waitlist_enabled: form.waitlistEnabled,
+        waitlist_offer_window:
+          form.waitlistEnabled ? Number(form.waitlistOfferWindow || 0) : null,
+        waitlist_queue_cap:
+          form.waitlistEnabled ? Number(form.waitlistQueueCap || 0) : null,
       };
 
       await axios.put(`${BASE_URL}/api/org/events/${eventId}`, payload, {
@@ -343,6 +373,52 @@ export default function EditEvent(props: EditEventProps): JSX.Element {
           <option value="free">Free</option>
           <option value="paid">Paid</option>
         </select>
+
+        {/* --- WAITLIST SETTINGS --- */}
+        <div
+          style={{
+            marginTop: 12,
+            padding: 12,
+            borderRadius: 10,
+            background: "#1b1b1b",
+            border: "1px solid #2b2b2b",
+          }}
+        >
+          <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={form.waitlistEnabled}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, waitlistEnabled: e.target.checked }))
+              }
+            />
+            <span>Enable waitlist</span>
+          </label>
+
+          {form.waitlistEnabled && (
+            <>
+              <input
+                type="number"
+                name="waitlistOfferWindow"
+                placeholder="Offer window (minutes)"
+                value={form.waitlistOfferWindow}
+                onChange={handleChange}
+                style={{ ...inputStyle, marginTop: 10 }}
+                min={1}
+              />
+
+              <input
+                type="number"
+                name="waitlistQueueCap"
+                placeholder="Queue cap (max people)"
+                value={form.waitlistQueueCap}
+                onChange={handleChange}
+                style={{ ...inputStyle, marginTop: 10 }}
+                min={1}
+              />
+            </>
+          )}
+        </div>
 
         <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
           <button

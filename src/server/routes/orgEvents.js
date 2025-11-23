@@ -92,6 +92,9 @@ router.get('/:id', authenticateToken, async (req, res) => {
         e.capacity,
         e.ticket_type,
         e.status,
+        e.waitlist_enabled,
+        e.waitlist_offer_window,
+        e.waitlist_queue_cap,
         COALESCE(
           COUNT(t.id) FILTER (WHERE t.status IN ('claimed','checked_in')), 0
         )::int AS issued_count,
@@ -123,9 +126,19 @@ router.get('/:id', authenticateToken, async (req, res) => {
 router.post('/', authenticateToken, async (req, res) => {
   const userId = req.user?.id;
   const {
-    title, description, category,
-    start_at, end_at, location,
-    capacity, ticket_type = 'free',
+    title,
+    description,
+    category,
+    start_at,
+    end_at,
+    location,
+    capacity,
+    ticket_type = "free",
+
+    // ✅ waitlist settings on create
+    waitlist_enabled,
+    waitlist_offer_window,
+    waitlist_queue_cap,
   } = req.body || {};
 
   if (!title || !start_at || !location || !capacity) {
@@ -135,6 +148,32 @@ router.post('/', authenticateToken, async (req, res) => {
     return sendError(res, 400, 'BAD_REQUEST', 'Capacity must be a positive integer');
   }
 
+  // ✅ basic validation for waitlist settings
+  if (waitlist_enabled) {
+    if (
+      !Number.isFinite(Number(waitlist_offer_window)) ||
+      Number(waitlist_offer_window) <= 0
+    ) {
+      return sendError(
+        res,
+        400,
+        "BAD_REQUEST",
+        "Offer window (minutes) must be a positive number"
+      );
+    }
+    if (
+      !Number.isFinite(Number(waitlist_queue_cap)) ||
+      Number(waitlist_queue_cap) <= 0
+    ) {
+      return sendError(
+        res,
+        400,
+        "BAD_REQUEST",
+        "Queue cap must be a positive number"
+      );
+    }
+  }
+
   try {
     // Find organizer row for this user
     const orgRes = await pool.query(`SELECT id FROM organizers WHERE user_id = $1`, [userId]);
@@ -142,15 +181,39 @@ router.post('/', authenticateToken, async (req, res) => {
 
     const org_id = orgRes.rows[0].id;
 
+    // ✅ normalize waitlist values on create
+    const wlEnabled = !!waitlist_enabled;
+    const wlWindow = wlEnabled ? Number(waitlist_offer_window || 0) : null;
+    const wlCap = wlEnabled ? Number(waitlist_queue_cap || 0) : null;
+
     const { rows } = await pool.query(
       `
       INSERT INTO events
-        (org_id, title, description, category, start_at, end_at, location, capacity, ticket_type, status, created_at, updated_at)
+        (org_id, title, description, category, start_at, end_at, location, capacity, ticket_type,
+         status, created_at, updated_at,
+         waitlist_enabled, waitlist_offer_window, waitlist_queue_cap)
       VALUES
-        ($1,$2,$3,$4,$5,$6,$7,$8,$9,'submitted', NOW(), NOW())
-      RETURNING id, org_id, title, description, category, start_at, end_at, location, capacity, ticket_type, status
+        ($1,$2,$3,$4,$5,$6,$7,$8,$9,
+         'submitted', NOW(), NOW(),
+         $10,$11,$12)
+      RETURNING id, org_id, title, description, category, start_at, end_at,
+                location, capacity, ticket_type, status,
+                waitlist_enabled, waitlist_offer_window, waitlist_queue_cap
       `,
-      [org_id, title, description || null, category || null, start_at, end_at || null, location, Number(capacity), ticket_type]
+      [
+        org_id,
+        title,
+        description || null,
+        category || null,
+        start_at,
+        end_at || null,
+        location,
+        Number(capacity),
+        ticket_type,
+        wlEnabled,
+        wlWindow,
+        wlCap,
+      ]
     );
 
     return res.status(201).json(rows[0]);
@@ -168,14 +231,50 @@ router.put('/:id', authenticateToken, async (req, res) => {
   const userId = req.user?.id;
   const eventId = Number(req.params.id);
   if (!Number.isFinite(eventId)) {
-    return sendError(res, 400, 'BAD_REQUEST', 'Invalid event id');
+    return sendError(res, 400, "BAD_REQUEST", "Invalid event id");
   }
 
   const {
-    title, description, category,
-    start_at, end_at, location,
-    capacity, ticket_type
+    title,
+    description,
+    category,
+    start_at,
+    end_at,
+    location,
+    capacity,
+    ticket_type,
+
+    // ✅ new waitlist settings from body
+    waitlist_enabled,
+    waitlist_offer_window,
+    waitlist_queue_cap,
   } = req.body || {};
+
+  // ---- basic validation for waitlist settings ----
+  if (waitlist_enabled) {
+    if (
+      !Number.isFinite(Number(waitlist_offer_window)) ||
+      Number(waitlist_offer_window) <= 0
+    ) {
+      return sendError(
+        res,
+        400,
+        "BAD_REQUEST",
+        "Offer window (minutes) must be a positive number"
+      );
+    }
+    if (
+      !Number.isFinite(Number(waitlist_queue_cap)) ||
+      Number(waitlist_queue_cap) <= 0
+    ) {
+      return sendError(
+        res,
+        400,
+        "BAD_REQUEST",
+        "Queue cap must be a positive number"
+      );
+    }
+  }
 
   try {
     // Ownership + time check
@@ -186,39 +285,56 @@ router.put('/:id', authenticateToken, async (req, res) => {
         WHERE e.id = $1 AND o.user_id = $2`,
       [eventId, userId]
     );
-    if (!own.length) return sendError(res, 403, 'FORBIDDEN', 'Not your event');
+    if (!own.length) {
+      return sendError(res, 403, "FORBIDDEN", "Not your event");
+    }
     if (own[0].start_at && new Date(own[0].start_at) <= new Date()) {
-      return sendError(res, 400, 'EVENT_STARTED', 'Cannot edit after event start');
+      return sendError(res, 400, "EVENT_STARTED", "Cannot edit after event start");
     }
 
     const { rows } = await pool.query(
       `
       UPDATE events
-         SET title = COALESCE($2, title),
-             description = COALESCE($3, description),
-             category = COALESCE($4, category),
-             start_at = COALESCE($5, start_at),
-             end_at = COALESCE($6, end_at),
-             location = COALESCE($7, location),
-             capacity = COALESCE($8, capacity),
-             ticket_type = COALESCE($9, ticket_type),
-             updated_at = NOW()
+         SET title                  = COALESCE($2,  title),
+             description            = COALESCE($3,  description),
+             category               = COALESCE($4,  category),
+             start_at               = COALESCE($5,  start_at),
+             end_at                 = COALESCE($6,  end_at),
+             location               = COALESCE($7,  location),
+             capacity               = COALESCE($8,  capacity),
+             ticket_type            = COALESCE($9,  ticket_type),
+             waitlist_enabled       = COALESCE($10, waitlist_enabled),
+             waitlist_offer_window  = $11,
+             waitlist_queue_cap     = $12,
+             updated_at             = NOW()
        WHERE id = $1
-       RETURNING id, org_id, title, description, category, start_at, end_at, location, capacity, ticket_type, status
+       RETURNING id, org_id, title, description, category, start_at, end_at,
+                 location, capacity, ticket_type, status,
+                 waitlist_enabled, waitlist_offer_window, waitlist_queue_cap
       `,
       [
         eventId,
-        title ?? null, description ?? null, category ?? null,
-        start_at ?? null, end_at ?? null, location ?? null,
-        capacity ?? null, ticket_type ?? null
+        title ?? null,
+        description ?? null,
+        category ?? null,
+        start_at ?? null,
+        end_at ?? null,
+        location ?? null,
+        capacity ?? null,
+        ticket_type ?? null,
+        typeof waitlist_enabled === "boolean" ? waitlist_enabled : null,
+        waitlist_enabled ? Number(waitlist_offer_window ?? 0) : null,
+        waitlist_enabled ? Number(waitlist_queue_cap ?? 0) : null,
       ]
     );
 
-    if (!rows.length) return sendError(res, 404, 'NOT_FOUND', 'Event not found');
+    if (!rows.length) {
+      return sendError(res, 404, "NOT_FOUND", "Event not found");
+    }
     return res.json(rows[0]);
   } catch (err) {
-    console.error('DB update error', err);
-    return sendError(res, 500, 'INTERNAL_ERROR', 'DB error', err.message);
+    console.error("DB update error", err);
+    return sendError(res, 500, "INTERNAL_ERROR", "DB error", err.message);
   }
 });
 
