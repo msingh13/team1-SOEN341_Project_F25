@@ -9,24 +9,22 @@ const { authenticateToken } = require("./middleware/auth");
 // Routers
 const savesRouter = require("./routes/saves.routes");
 const eventsRouter = require("./routes/events");
-const adminRouter = require("./routes/admin.routes"); // your moderation, etc.
+const adminRouter = require("./routes/admin.routes");
 const ticketClaimRoutes = require("./routes/events.tickets");
 const organizerRoutes = require("./routes/organizer.routes");
 const ticketRoute = require("./routes/ticketRoute");
 const orgEventsRouter = require("./routes/orgEvents");
 const offersRoutes = require("./routes/offers");
 
-
 const devRoutes = require("./routes/dev.js");
 const authRoutes = require("./routes/auth.routes");
 const adminOrgsRouter = require("./routes/admin.orgs.routes");
 const adminAnalyticsRouter = require("./routes/admin.analytics.routes");
 
+// ✅ TON WAITLIST ENDPOINT (correct)
 const waitlistRoutes = require("./routes/events.waitlist.routes");
 
-
 const app = express();
-
 
 // CORS + JSON
 app.use(
@@ -55,7 +53,10 @@ app.use("/auth", authRoutes);
 // Saves, events, tickets, my tickets, org events
 app.use("/", savesRouter);
 app.use("/events", eventsRouter);
-app.use("/", waitlistRoutes);
+
+// ✅ ICI → le waitlist router DOIT être sur `/events/...`
+app.use("/events", waitlistRoutes);
+
 app.use("/", ticketClaimRoutes);
 app.use("/", ticketRoute);
 app.use("/api/org/events", orgEventsRouter);
@@ -65,9 +66,8 @@ app.use("/", adminOrgsRouter);
 app.use("/", adminAnalyticsRouter);
 app.use("/admin", adminRouter);
 
-// offers
+// Offers
 app.use("/offers", offersRoutes);
-
 
 // 404
 app.use((_req, res) => res.status(404).json({ code: "NOT_FOUND", message: "Route not found" }));
