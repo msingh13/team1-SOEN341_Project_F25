@@ -4,6 +4,7 @@ import { useParams } from "react-router-dom";
 import SaveButton from "../components/SaveButton";
 import ClaimTicketButton from "../components/ClaimTicketButton";
 import TicketConfirmationModal from "../components/TicketConfirmationModal";
+import JoinWaitlist from "../components/JoinWaitlist";
 import { claimTicket, ClaimTicketError, type ClaimSuccess } from "../api/claimTicket";
 import EventWaitlistTab from "./EventWaitlistTab";
 
@@ -88,23 +89,26 @@ export default function EventDetail() {
     return () => {
       cancelled = true;
     };
-  }, [id, isOrganizer]);
+  }, [id]);
 
+  // ...
   async function handleClaim() {
     if (!id || claimLoading) return;
     setClaimLoading(true);
     try {
+      // ✅ pass numeric id to your API helper
       const result = await claimTicket(Number(id));
       setTicket(result);
       setHasClaimed(true);
-    } catch (e: unknown) {
+    } catch (e) {
+      // unchanged…
       if (e instanceof ClaimTicketError) {
         alert(
           e.reason === "sold_out"
             ? "❌ This event is sold out."
             : e.reason === "already_claimed"
-            ? "You already claimed a ticket."
-            : "You must be signed in."
+              ? "You already claimed a ticket."
+              : "You must be signed in."
         );
       } else {
         alert("Something went wrong claiming your ticket.");
@@ -163,26 +167,16 @@ export default function EventDetail() {
 
   const soldOut = event.remaining_seats <= 0;
 
-  function downloadIcs(ev: {
-    title: string;
-    start_time: string;
-    end_time?: string;
-    location?: string;
-  }) {
+  function downloadIcs(ev: { title: string; start_time: string; end_time?: string; location?: string }) {
     const lines = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
       "PRODID:-//Campus Events//EN",
       "BEGIN:VEVENT",
       `UID:${ev.title}-${ev.start_time}`,
-      `DTSTAMP:${new Date()
-        .toISOString()
-        .replace(/[-:]/g, "")
-        .split(".")[0]}Z`,
+      `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").split(".")[0]}Z`,
       `DTSTART:${ev.start_time.replace(/[-:]/g, "").split(".")[0]}Z`,
-      ev.end_time
-        ? `DTEND:${ev.end_time.replace(/[-:]/g, "").split(".")[0]}Z`
-        : "",
+      ev.end_time ? `DTEND:${ev.end_time.replace(/[-:]/g, "").split(".")[0]}Z` : "",
       `SUMMARY:${ev.title}`,
       ev.location ? `LOCATION:${ev.location}` : "",
       "END:VEVENT",
@@ -200,6 +194,7 @@ export default function EventDetail() {
     a.click();
     URL.revokeObjectURL(a.href);
   }
+
 
   return (
     <div style={{ padding: "2rem", maxWidth: 820, margin: "0 auto" }}>
@@ -275,9 +270,15 @@ export default function EventDetail() {
             />
           )}
 
+          {/* Waitlist (only if sold out and not claimed) */}
+          {soldOut && !hasClaimed && isStudent && (
+            <JoinWaitlist eventId={event.id} isSoldOut={soldOut} />
+          )}
+
+          {/* Status message */}
           {(soldOut || hasClaimed) && (
             <span style={{ color: "#bbb" }}>
-              {soldOut ? "❌ Sold out" : "🎟️ Ticket claimed"}
+              {soldOut && !hasClaimed ? "❌ Sold out" : hasClaimed ? "🎟️ Ticket claimed" : ""}
             </span>
           )}
         </div>
