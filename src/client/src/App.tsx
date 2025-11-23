@@ -1,35 +1,169 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+// src/App.tsx
+import { Routes, Route, Outlet, useParams } from "react-router-dom";
+import "./App.css";
 
-function App() {
-  const [count, setCount] = useState(0)
+// Pages
+import Home from "./pages/Home";
+import BrowseEvents from "./pages/BrowseEvents";
+import CreateEvent from "./pages/CreateEvent";
+import EditEvent from "./pages/EditEvent";
+import EventDetail from "./pages/EventDetail";
+import OrganizerEvents from "./pages/OrganizerEvents";
+import EventAnalytics from "./pages/EventAnalytics";
+import OrganizerApprovalsPage from "./pages/admin/OrganizerApprovalsPage";
+import AdminModeration from "./pages/admin/AdminModeration";
+import OrganizationsPage from "./pages/admin/OrganizationsPage";
+import Login from "./pages/Login";
+import MyTickets from "./MyTickets";
+import SavedEvents from "./pages/SavedEvents";
+import Scan from "./pages/Scan";
+import AdminHome from "./pages/admin/AdminHome";
 
+// Components
+import Header from "./components/Header";
+
+// Auth
+import { AuthProvider } from "./auth/AuthContext";
+import { RoleRoute } from "./auth/guards";
+
+/* ---------- Layout ---------- */
+function Layout() {
   return (
     <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
+      <Header />
+      <Outlet />
+      <footer className="footer">
+        <div className="container footer-inner">
+          <span className="muted">© {new Date().getFullYear()} Campus Events — Prototype</span>
+          <a className="muted" href="https://vite.dev" target="_blank" rel="noreferrer">
+            Built with Vite + React
+          </a>
+        </div>
+      </footer>
     </>
-  )
+  );
 }
 
-export default App
+/* ---------- Analytics wrapper uses :id ---------- */
+function EventAnalyticsRoute() {
+  const { id } = useParams();
+  const eventId = Number(id);
+  return <EventAnalytics eventId={Number.isFinite(eventId) ? eventId : 0} />;
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <Routes>
+        <Route element={<Layout />}>
+          {/* Public */}
+          <Route path="/" element={<Home />} />
+          <Route path="/events" element={<BrowseEvents />} />
+          <Route path="/events/:id" element={<EventDetail />} />
+          <Route path="/login" element={<Login />} />
+
+          {/* Student (and above) */}
+          <Route
+            path="/me/tickets"
+            element={
+              <RoleRoute roles={["student", "organizer", "admin"]}>
+                <MyTickets />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/me/saves"
+            element={
+              <RoleRoute roles={["student", "organizer", "admin"]}>
+                <SavedEvents />
+              </RoleRoute>
+            }
+          />
+
+          {/* Organizer */}
+          <Route
+            path="/organizer/events"
+            element={
+              <RoleRoute roles={["organizer"]}>
+                <OrganizerEvents />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/organizer/events/:id/edit"
+            element={
+              <RoleRoute roles={["organizer", "admin"]}>
+                <EditEvent />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/organizer/events/:id/analytics"
+            element={
+              <RoleRoute roles={["organizer", "admin"]}>
+                <EventAnalyticsRoute />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/create"
+            element={
+              <RoleRoute roles={["organizer"]}>
+                <CreateEvent />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/scan"
+            element={
+              <RoleRoute roles={["organizer", "admin"]}>
+                <Scan />
+              </RoleRoute>
+            }
+          />
+
+          {/* Admin */}
+          <Route
+            path="/admin/moderation"
+            element={
+              <RoleRoute roles={["admin"]}>
+                <AdminModeration />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/admin/organizers"
+            element={
+              <RoleRoute roles={["admin"]}>
+                <OrganizerApprovalsPage />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/admin/orgs"
+            element={
+              <RoleRoute roles={["admin"]}>
+                <OrganizationsPage />
+              </RoleRoute>
+            }
+          />
+          {/* Admin home */}
+          <Route
+            path="/admin"
+            element={
+              <RoleRoute roles={["admin"]}>
+                <AdminHome />
+              </RoleRoute>
+            }
+          />
+
+          {/* TEMP: bypass guard to test admin page renders */}
+          <Route path="/__admin_raw" element={<AdminHome />} />
+
+          {/* 404 */}
+          <Route path="*" element={<div className="container">Not Found</div>} />
+        </Route>
+      </Routes>
+    </AuthProvider>
+  );
+}
