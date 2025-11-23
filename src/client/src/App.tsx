@@ -18,6 +18,7 @@ import MyTickets from "./MyTickets";
 import SavedEvents from "./pages/SavedEvents";
 import Scan from "./pages/Scan";
 import AdminHome from "./pages/admin/AdminHome";
+import WaitlistPolicyPage from "./pages/WaitlistPolicyPage";
 
 // Components
 import Header from "./components/Header";
@@ -144,6 +145,14 @@ export default function App() {
             element={
               <RoleRoute roles={["admin"]}>
                 <OrganizationsPage />
+              </RoleRoute>
+            }
+          />
+          <Route
+            path="/admin/waitlist-policy"
+            element={
+              <RoleRoute roles={["admin"]}>
+                <WaitlistPolicyPage />
               </RoleRoute>
             }
           />
