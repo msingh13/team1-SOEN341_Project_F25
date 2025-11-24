@@ -5,7 +5,7 @@ import { useAuth } from "../auth/AuthContext";
 import { useNavigate, useLocation } from "react-router-dom";
 
 export default function Login() {
-  const [id, setId] = useState("3");
+  const [id, setId] = useState("12345");
   const [role, setRole] = useState<"student" | "organizer" | "admin">("student");
   const [err, setErr] = useState("");
   const { login } = useAuth();

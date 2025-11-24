@@ -73,13 +73,13 @@ useEffect(() => {
       let out: Row[] | null = null;
 
       // 1) Try the primary route
-      try {
-        const data = await fetchSafely(`${API_URL}/me/events`);
-        const list: Wire[] = Array.isArray(data) ? data : data?.data ?? [];
-        out = normalize(list);
-      } catch (_e) {
-        // swallow — we'll try fallback below
-      }
+      // try {
+      //   const data = await fetchSafely(`${API_URL}/me/events`);
+      //   const list: Wire[] = Array.isArray(data) ? data : data?.data ?? [];
+      //   out = normalize(list);
+      // } catch (_e) {
+      //   // swallow — we'll try fallback below
+      // }
 
       // 2) Fallback if primary failed or came back empty
       if (!out || out.length === 0) {
