@@ -25,6 +25,8 @@ const adminAnalyticsRouter = require("./routes/admin.analytics.routes");
 const waitlistRoutes = require("./routes/events.waitlist.routes");
 const adminWaitlistRoutes = require("./routes/admin.waitlist.routes");
 
+const eventSettingsRouter = require("./routes/events.settings.routes");
+
 const app = express();
 
 // CORS + JSON
@@ -57,6 +59,7 @@ app.use("/events", eventsRouter);
 
 // ✅ ICI → le waitlist router DOIT être sur `/events/...`
 app.use("/events", waitlistRoutes);
+app.use("/events", eventSettingsRouter);  
 
 app.use("/", ticketClaimRoutes);
 app.use("/", ticketRoute);
