@@ -79,7 +79,7 @@ useEffect(() => {
         out = normalize(list);
       } catch (_e) {
         // swallow — we'll try fallback below
-       }
+      }
 
       // 2) Fallback if primary failed or came back empty
       if (!out || out.length === 0) {
