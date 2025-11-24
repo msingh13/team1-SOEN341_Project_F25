@@ -1,10 +1,10 @@
 // src/server/routes/orgEvents.js
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const pool = require('../db');
+const pool = require("../db");
 
 // ✅ Defensive middleware import (supports default or named export)
-const authModule = require('../middleware/auth');
+const authModule = require("../middleware/auth");
 const authenticateToken = authModule?.authenticateToken || authModule;
 
 // ---------- helper ----------
@@ -17,67 +17,105 @@ function sendError(res, status, code, message, details) {
 /* =========================================================
  *  LIST (Organizer scope)
  *  GET /api/org/events?mine=1
- *  - mine=1 => only events that belong to the current organizer (by user_id)
+ *  - mine=1 => only events that belong to the current organizer/admin
  *  - returns issued_count and remaining computed from tickets
  * ======================================================= */
-router.get('/', authenticateToken, async (req, res) => {
+router.get("/", authenticateToken, async (req, res) => {
   const userId = req.user?.id;
-  const mine = String(req.query.mine || '') === '1';
+  const mine = String(req.query.mine || "") === "1";
 
   try {
-    let where = '';
+    let sql;
     let params = [];
+
     if (mine) {
-      // limit to events owned by the organizer (user_id)
-      where = `WHERE o.user_id = $1`;
+      // Events where the user has organizer/admin role in that org
+      sql = `
+        SELECT
+          e.id,
+          e.title,
+          e.location,
+          e.start_at,
+          e.capacity,
+          e.status,
+          COALESCE(
+            COUNT(t.id) FILTER (WHERE t.status IN ('claimed','checked_in')), 0
+          )::int AS issued_count,
+          GREATEST(
+            e.capacity - COALESCE(COUNT(t.id) FILTER (WHERE t.status IN ('claimed','checked_in')), 0),
+            0
+          )::int AS remaining
+        FROM events e
+        JOIN user_org_roles r ON r.org_id = e.org_id
+        LEFT JOIN tickets t ON t.event_id = e.id
+        WHERE r.user_id = $1
+          AND r.role IN ('organizer','admin')
+        GROUP BY e.id, e.title, e.location, e.start_at, e.capacity, e.status
+        ORDER BY e.start_at NULLS LAST, e.id
+      `;
       params = [userId];
+    } else {
+      // All org events (used mainly by admin UIs if needed)
+      sql = `
+        SELECT
+          e.id,
+          e.title,
+          e.location,
+          e.start_at,
+          e.capacity,
+          e.status,
+          COALESCE(
+            COUNT(t.id) FILTER (WHERE t.status IN ('claimed','checked_in')), 0
+          )::int AS issued_count,
+          GREATEST(
+            e.capacity - COALESCE(COUNT(t.id) FILTER (WHERE t.status IN ('claimed','checked_in')), 0),
+            0
+          )::int AS remaining
+        FROM events e
+        LEFT JOIN tickets t ON t.event_id = e.id
+        GROUP BY e.id, e.title, e.location, e.start_at, e.capacity, e.status
+        ORDER BY e.start_at NULLS LAST, e.id
+      `;
     }
 
-    const { rows } = await pool.query(
-      `
-      SELECT
-        e.id,
-        e.title,
-        e.location,
-        e.start_at,
-        e.capacity,
-        e.status,
-        COALESCE(
-          COUNT(t.id) FILTER (WHERE t.status IN ('claimed','checked_in')), 0
-        )::int AS issued_count,
-        GREATEST(
-          e.capacity - COALESCE(COUNT(t.id) FILTER (WHERE t.status IN ('claimed','checked_in')), 0),
-          0
-        )::int AS remaining
-      FROM events e
-      JOIN organizers o ON o.id = e.org_id
-      LEFT JOIN tickets t ON t.event_id = e.id
-      ${where}
-      GROUP BY e.id, e.title, e.location, e.start_at, e.capacity, e.status
-      ORDER BY e.start_at NULLS LAST, e.id
-      `,
-      params
-    );
-
+    const { rows } = await pool.query(sql, params);
     return res.json(rows);
   } catch (err) {
-    console.error('orgEvents list error', err);
-    return sendError(res, 500, 'INTERNAL_ERROR', 'DB error', err.message);
+    console.error("orgEvents list error", err);
+    return sendError(res, 500, "INTERNAL_ERROR", "DB error", err.message);
   }
 });
 
 /* =========================================================
  *  SINGLE (Organizer scope)
  *  GET /api/org/events/:id
- *  - returns issued_count and remaining too
+ *  - Only accessible if user is organizer/admin for that org
  * ======================================================= */
-router.get('/:id', authenticateToken, async (req, res) => {
+router.get("/:id", authenticateToken, async (req, res) => {
+  const userId = req.user?.id;
   const eventId = Number(req.params.id);
   if (!Number.isFinite(eventId)) {
-    return sendError(res, 400, 'BAD_REQUEST', 'Invalid event id');
+    return sendError(res, 400, "BAD_REQUEST", "Invalid event id");
   }
 
   try {
+    // Ownership check via user_org_roles
+    const own = await pool.query(
+      `
+      SELECT e.id
+      FROM events e
+      JOIN user_org_roles r ON r.org_id = e.org_id
+      WHERE e.id = $1
+        AND r.user_id = $2
+        AND r.role IN ('organizer','admin')
+      LIMIT 1
+      `,
+      [eventId, userId]
+    );
+    if (own.rowCount === 0) {
+      return sendError(res, 403, "FORBIDDEN", "Not your event");
+    }
+
     const { rows } = await pool.query(
       `
       SELECT
@@ -110,20 +148,21 @@ router.get('/:id', authenticateToken, async (req, res) => {
       [eventId]
     );
 
-    if (!rows.length) return sendError(res, 404, 'NOT_FOUND', 'Event not found');
+    if (!rows.length) return sendError(res, 404, "NOT_FOUND", "Event not found");
     return res.json(rows[0]);
   } catch (err) {
-    console.error('orgEvents get error', err);
-    return sendError(res, 500, 'INTERNAL_ERROR', 'DB error', err.message);
+    console.error("orgEvents get error", err);
+    return sendError(res, 500, "INTERNAL_ERROR", "DB error", err.message);
   }
 });
 
 /* =========================================================
  *  CREATE
  *  POST /api/org/events
- *  Body: { title, description?, category?, start_at, end_at?, location, capacity, ticket_type? }
+ *  Body: { title, description?, category?, start_at, end_at?, location, capacity, ticket_type?,
+ *          waitlist_enabled?, waitlist_offer_window?, waitlist_queue_cap? }
  * ======================================================= */
-router.post('/', authenticateToken, async (req, res) => {
+router.post("/", authenticateToken, async (req, res) => {
   const userId = req.user?.id;
   const {
     title,
@@ -135,20 +174,20 @@ router.post('/', authenticateToken, async (req, res) => {
     capacity,
     ticket_type = "free",
 
-    // ✅ waitlist settings on create
+    // waitlist settings on create
     waitlist_enabled,
     waitlist_offer_window,
     waitlist_queue_cap,
   } = req.body || {};
 
   if (!title || !start_at || !location || !capacity) {
-    return sendError(res, 400, 'BAD_REQUEST', 'Missing required fields');
+    return sendError(res, 400, "BAD_REQUEST", "Missing required fields");
   }
   if (!Number.isFinite(Number(capacity)) || Number(capacity) <= 0) {
-    return sendError(res, 400, 'BAD_REQUEST', 'Capacity must be a positive integer');
+    return sendError(res, 400, "BAD_REQUEST", "Capacity must be a positive integer");
   }
 
-  // ✅ basic validation for waitlist settings
+  // basic validation for waitlist settings
   if (waitlist_enabled) {
     if (
       !Number.isFinite(Number(waitlist_offer_window)) ||
@@ -175,13 +214,25 @@ router.post('/', authenticateToken, async (req, res) => {
   }
 
   try {
-    // Find organizer row for this user
-    const orgRes = await pool.query(`SELECT id FROM organizers WHERE user_id = $1`, [userId]);
-    if (orgRes.rowCount === 0) return sendError(res, 403, 'FORBIDDEN', 'Organizer role required');
+    // Find an org where this user is organizer/admin
+    const orgRes = await pool.query(
+      `
+      SELECT org_id
+      FROM user_org_roles
+      WHERE user_id = $1
+        AND role IN ('organizer','admin')
+      ORDER BY org_id
+      LIMIT 1
+      `,
+      [userId]
+    );
+    if (orgRes.rowCount === 0) {
+      return sendError(res, 403, "FORBIDDEN", "Organizer role required");
+    }
 
-    const org_id = orgRes.rows[0].id;
+    const org_id = orgRes.rows[0].org_id;
 
-    // ✅ normalize waitlist values on create
+    // normalize waitlist values on create
     const wlEnabled = !!waitlist_enabled;
     const wlWindow = wlEnabled ? Number(waitlist_offer_window || 0) : null;
     const wlCap = wlEnabled ? Number(waitlist_queue_cap || 0) : null;
@@ -218,8 +269,8 @@ router.post('/', authenticateToken, async (req, res) => {
 
     return res.status(201).json(rows[0]);
   } catch (err) {
-    console.error('DB insert error', err);
-    return sendError(res, 500, 'INTERNAL_ERROR', 'DB error', err.message);
+    console.error("DB insert error", err);
+    return sendError(res, 500, "INTERNAL_ERROR", "DB error", err.message);
   }
 });
 
@@ -227,7 +278,7 @@ router.post('/', authenticateToken, async (req, res) => {
  *  UPDATE (before event start)
  *  PUT /api/org/events/:id
  * ======================================================= */
-router.put('/:id', authenticateToken, async (req, res) => {
+router.put("/:id", authenticateToken, async (req, res) => {
   const userId = req.user?.id;
   const eventId = Number(req.params.id);
   if (!Number.isFinite(eventId)) {
@@ -244,13 +295,13 @@ router.put('/:id', authenticateToken, async (req, res) => {
     capacity,
     ticket_type,
 
-    // ✅ new waitlist settings from body
+    // new waitlist settings from body
     waitlist_enabled,
     waitlist_offer_window,
     waitlist_queue_cap,
   } = req.body || {};
 
-  // ---- basic validation for waitlist settings ----
+  // waitlist validation
   if (waitlist_enabled) {
     if (
       !Number.isFinite(Number(waitlist_offer_window)) ||
@@ -277,12 +328,17 @@ router.put('/:id', authenticateToken, async (req, res) => {
   }
 
   try {
-    // Ownership + time check
+    // Ownership + time check via user_org_roles
     const { rows: own } = await pool.query(
-      `SELECT e.id, e.start_at
-         FROM events e
-         JOIN organizers o ON o.id = e.org_id
-        WHERE e.id = $1 AND o.user_id = $2`,
+      `
+      SELECT e.id, e.start_at
+      FROM events e
+      JOIN user_org_roles r ON r.org_id = e.org_id
+      WHERE e.id = $1
+        AND r.user_id = $2
+        AND r.role IN ('organizer','admin')
+      LIMIT 1
+      `,
       [eventId, userId]
     );
     if (!own.length) {
@@ -342,30 +398,34 @@ router.put('/:id', authenticateToken, async (req, res) => {
  *  CSV EXPORT
  *  GET /api/org/events/:id/attendees.csv
  * ======================================================= */
-router.get('/:id/attendees.csv', authenticateToken, async (req, res) => {
+router.get("/:id/attendees.csv", authenticateToken, async (req, res) => {
   const userId = req.user?.id;
   const eventId = Number(req.params.id);
   if (!Number.isFinite(eventId)) {
-    return sendError(res, 400, 'BAD_REQUEST', 'Invalid event id');
+    return sendError(res, 400, "BAD_REQUEST", "Invalid event id");
   }
 
   try {
-    // Ownership check
+    // Ownership check via user_org_roles
     const { rows: own } = await pool.query(
-      `SELECT e.id
-         FROM events e
-         JOIN organizers o ON o.id = e.org_id
-        WHERE e.id = $1 AND o.user_id = $2`,
+      `
+      SELECT e.id
+      FROM events e
+      JOIN user_org_roles r ON r.org_id = e.org_id
+      WHERE e.id = $1
+        AND r.user_id = $2
+        AND r.role IN ('organizer','admin')
+      LIMIT 1
+      `,
       [eventId, userId]
     );
-    if (!own.length) return sendError(res, 403, 'FORBIDDEN', 'Not your event');
+    if (!own.length) return sendError(res, 403, "FORBIDDEN", "Not your event");
 
-    // Build CSV rows
     const { rows } = await pool.query(
       `
       SELECT
         u.name           AS attendee_name,
-        u.student_id     AS student_id,     -- uses your column
+        u.student_id     AS student_id,
         u.email          AS email,
         t.id             AS ticket_id,
         t.status         AS ticket_status,
@@ -379,78 +439,93 @@ router.get('/:id/attendees.csv', authenticateToken, async (req, res) => {
       [eventId]
     );
 
-    const keys = ["attendee_name","student_id","email","ticket_id","ticket_status","issued_at","checked_in_at"];
+    const keys = [
+      "attendee_name",
+      "student_id",
+      "email",
+      "ticket_id",
+      "ticket_status",
+      "issued_at",
+      "checked_in_at",
+    ];
     const header = keys.join(",");
-    const lines = rows.map(r => keys.map(k => {
-      let v = r[k] == null ? "" : String(r[k]);
-      if (v.includes(",") || v.includes('"') || v.includes("\n")) {
-        v = '"' + v.replace(/"/g,'""') + '"';
-      }
-      return v;
-    }).join(","));
+    const lines = rows.map((r) =>
+      keys
+        .map((k) => {
+          let v = r[k] == null ? "" : String(r[k]);
+          if (v.includes(",") || v.includes('"') || v.includes("\n")) {
+            v = '"' + v.replace(/"/g, '""') + '"';
+          }
+          return v;
+        })
+        .join(",")
+    );
 
     res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="attendees-${eventId}.csv"`);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="attendees-${eventId}.csv"`
+    );
     return res.send([header, ...lines].join("\n"));
   } catch (err) {
-    console.error('DB attendees error', err);
-    return sendError(res, 500, 'INTERNAL_ERROR', 'Server error', err.message);
+    console.error("DB attendees error", err);
+    return sendError(res, 500, "INTERNAL_ERROR", "Server error", err.message);
   }
 });
 
 /* =========================================================
- *  ANALYTICS  (matches client path /api/org/events/:id/analytics)
- *  GET /:id/analytics
- *  - Ownership check (organizer must own the event)
- *  - Returns issued, checked-in, remaining, attendance rate
+ *  ANALYTICS
+ *  GET /api/org/events/:id/analytics
  * ======================================================= */
-router.get('/:id/analytics', authenticateToken, async (req, res) => {
+router.get("/:id/analytics", authenticateToken, async (req, res) => {
   const userId = req.user?.id;
   const eventId = Number(req.params.id);
   if (!Number.isFinite(eventId)) {
-    return sendError(res, 400, 'BAD_REQUEST', 'Invalid event id');
+    return sendError(res, 400, "BAD_REQUEST", "Invalid event id");
   }
 
   try {
-    // Verify the requester owns this event via organizers table
+    // Ownership check via user_org_roles
     const own = await pool.query(
       `
       SELECT e.id
-        FROM events e
-        JOIN organizers o ON o.id = e.org_id OR o.org_id = e.org_id
-       WHERE e.id = $1 AND o.user_id = $2
-       LIMIT 1
+      FROM events e
+      JOIN user_org_roles r ON r.org_id = e.org_id
+      WHERE e.id = $1
+        AND r.user_id = $2
+        AND r.role IN ('organizer','admin')
+      LIMIT 1
       `,
       [eventId, userId]
     );
     if (own.rowCount === 0) {
-      return sendError(res, 403, 'FORBIDDEN', 'Not your event');
+      return sendError(res, 403, "FORBIDDEN", "Not your event");
     }
 
-    // Aggregate ticket stats
     const { rows } = await pool.query(
       `
       SELECT
-        e.id,
         COALESCE(e.capacity, 0)                                                AS capacity,
         COALESCE(SUM(CASE WHEN t.id IS NOT NULL THEN 1 ELSE 0 END), 0)::int    AS tickets_issued,
         COALESCE(SUM(CASE WHEN t.status = 'checked_in' THEN 1 ELSE 0 END), 0)::int AS tickets_checked_in
       FROM events e
       LEFT JOIN tickets t ON t.event_id = e.id
       WHERE e.id = $1
-      GROUP BY e.id, e.capacity
+      GROUP BY e.capacity
       `,
       [eventId]
     );
 
     if (!rows.length) {
-      return sendError(res, 404, 'NOT_FOUND', 'Event not found');
+      return sendError(res, 404, "NOT_FOUND", "Event not found");
     }
 
     const r = rows[0];
     const remaining_capacity = Math.max(r.capacity - r.tickets_issued, 0);
     const attendance_rate =
-      r.tickets_issued === 0 ? 0 : Math.round((r.tickets_checked_in / r.tickets_issued) * 100);
+      r.tickets_issued === 0
+        ? 0
+        : Math.round((r.tickets_checked_in / r.tickets_issued) * 100);
 
     return res.json({
       tickets_issued: r.tickets_issued,
@@ -459,8 +534,14 @@ router.get('/:id/analytics', authenticateToken, async (req, res) => {
       attendance_rate,
     });
   } catch (err) {
-    console.error('orgEvents analytics error', err);
-    return sendError(res, 500, 'INTERNAL_ERROR', 'Failed to load analytics', err.message);
+    console.error("orgEvents analytics error", err);
+    return sendError(
+      res,
+      500,
+      "INTERNAL_ERROR",
+      "Failed to load analytics",
+      err.message
+    );
   }
 });
 

@@ -17,14 +17,12 @@ CREATE INDEX IF NOT EXISTS idx_offers_token ON offers(token);
 CREATE INDEX IF NOT EXISTS idx_offers_event ON offers(event_id);
 CREATE INDEX IF NOT EXISTS idx_offers_user ON offers(user_id);
 
--- 2) ensure events has a capacity column to validate availability
+-- 2) ensure events.capacity is NOT NULL and has a default
 ALTER TABLE events
-  ADD COLUMN IF NOT EXISTS capacity INTEGER;
+  ALTER COLUMN capacity SET NOT NULL,
+  ALTER COLUMN capacity SET DEFAULT 0;
 
--- Optional: if you track sold/remaining, you can add this too (not required if you count tickets)
--- ALTER TABLE events ADD COLUMN IF NOT EXISTS remaining_capacity INTEGER;
-
--- 3) helpful partial index for unused/valid offers (optional)
+-- 3) helpful partial index for unused/valid offers
 CREATE INDEX IF NOT EXISTS idx_offers_valid
   ON offers(event_id, expires_at)
   WHERE used_at IS NULL;

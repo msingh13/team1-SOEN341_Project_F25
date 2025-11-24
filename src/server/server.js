@@ -1,10 +1,9 @@
+// src/server/server.js
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 
 const pool = require("./db");
-
-const { authenticateToken } = require("./middleware/auth");
 
 // Routers
 const savesRouter = require("./routes/saves.routes");
@@ -14,71 +13,83 @@ const ticketClaimRoutes = require("./routes/events.tickets");
 const organizerRoutes = require("./routes/organizer.routes");
 const ticketRoute = require("./routes/ticketRoute");
 const orgEventsRouter = require("./routes/orgEvents");
-const offersRoutes = require("./routes/offers");
-
 const devRoutes = require("./routes/dev.js");
 const authRoutes = require("./routes/auth.routes");
 const adminOrgsRouter = require("./routes/admin.orgs.routes");
 const adminAnalyticsRouter = require("./routes/admin.analytics.routes");
 
-// ✅ TON WAITLIST ENDPOINT (correct)
-const waitlistRoutes = require("./routes/events.waitlist.routes");
-const adminWaitlistRoutes = require("./routes/admin.waitlist.routes");
-
 const app = express();
 
-// CORS + JSON
+const PORT = process.env.PORT || 4000;
+const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
+
+// ---------- Global middleware ----------
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || "http://localhost:5173",
+    origin: CORS_ORIGIN,
     allowedHeaders: ["Content-Type", "Authorization", "X-User-Id"],
+    credentials: true,
   })
 );
+
 app.use(express.json());
 
-// Health
-app.get("/health", (_req, res) => res.json({ ok: true }));
-app.get("/__health/db", async (_req, res) => {
+// ---------- Health check ----------
+app.get("/health", async (_req, res) => {
   try {
-    const { rows } = await pool.query("SELECT 1 AS ok");
-    res.json({ db: "up", ok: rows[0].ok === 1 });
-  } catch (e) {
-    res.status(500).json({ db: "down", error: e.message });
+    await pool.query("SELECT 1");
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Health check DB error", err);
+    res.status(500).json({ ok: false });
   }
 });
 
-// Dev & Auth
-app.use("/dev", devRoutes);
-app.use("/auth", authRoutes);
+// ---------- Auth ----------
+app.use(authRoutes); // /auth/register, /auth/login, /auth/me
 
-// Saves, events, tickets, my tickets, org events
-app.use("/", savesRouter);
-app.use("/events", eventsRouter);
+// ---------- Public / student / organizer routes ----------
+app.use(eventsRouter);        // /events...
+app.use(ticketClaimRoutes);   // /events/:id/claim, etc.
+app.use(ticketRoute);         // /me/tickets, /me/waitlists
+app.use(savesRouter);         // /events/:id/save, /me/saves
+app.use(orgEventsRouter);     // /organizer/events...
+app.use(organizerRoutes);     // other organizer routes
+app.use(devRoutes);           // dev helpers (if any)
 
-// ✅ ICI → le waitlist router DOIT être sur `/events/...`
-app.use("/events", waitlistRoutes);
+// ---------- Admin & analytics ----------
+app.use("/admin", adminRouter); // /admin/organizers/pending, /admin/events/...
+app.use(adminOrgsRouter);       // /admin/orgs, /api/admin/organizations, etc.
+app.use(adminAnalyticsRouter);  // /admin/stats
 
-app.use("/", ticketClaimRoutes);
-app.use("/", ticketRoute);
-app.use("/api/org/events", orgEventsRouter);
+// ---------- 404 fallback ----------
+app.use((req, res) => {
+  res.status(404).json({
+    code: "NOT_FOUND",
+    message: `Route ${req.method} ${req.originalUrl} not found`,
+  });
+});
 
-// Admin (orgs/roles + analytics + moderation)
-app.use("/", adminOrgsRouter);
-app.use("/", adminAnalyticsRouter);
-app.use("/admin", adminRouter);
-app.use("/admin/waitlist", adminWaitlistRoutes);
+// ---------- Error handler ----------
+app.use((err, _req, res, _next) => {
+  console.error("Unhandled error:", err);
+  res
+    .status(500)
+    .json({ code: "INTERNAL_ERROR", message: "Unexpected server error" });
+});
 
-
-// Offers
-app.use("/offers", offersRoutes);
-
-// 404
-app.use((_req, res) => res.status(404).json({ code: "NOT_FOUND", message: "Route not found" }));
-
-const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`🚀 Server @ http://localhost:${PORT}`));
-
+// ---------- Start server (no async wrapper, so process stays alive) ----------
 pool
   .query("SELECT 1")
-  .then(() => console.log("✅ DB ping OK"))
-  .catch((err) => console.error("❌ DB ping FAILED", err));
+  .then(() => {
+    console.log("✅ DB ping OK");
+  })
+  .catch((err) => {
+    console.error("❌ DB ping failed", err);
+  });
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server @ http://localhost:${PORT}`);
+});
+
+module.exports = app;

@@ -1,26 +1,30 @@
-const db = require('../index'); // Imports the database connection
+// server/db/queries/audit.js
+const db = require('../index');
 
 /**
- * Logs an action to the audit_logs table.
- * * @param {string} action - The type of action (e.g., 'DELETE_EVENT')
- * @param {number} performedBy - The ID of the user performing the action
- * @param {number|null} targetId - (Optional) The ID of the object affected
- * @param {object|null} details - (Optional) Extra details object to store as JSON
+ * Logs an action into audit_logs table.
+ *
+ * @param {string} action       - Action type (e.g., 'DELETE_EVENT', 'PUBLISH_EVENT')
+ * @param {number} performedBy  - User ID who performed the action
+ * @param {number|null} targetId - (Optional) ID of the affected record
+ * @param {object|null} details  - (Optional) extra metadata (stored as JSON)
  */
 exports.logAction = async (action, performedBy, targetId = null, details = null) => {
   try {
-    const query = `
-      INSERT INTO audit_logs (action, performed_by, target_id, details)
-      VALUES (?, ?, ?, ?)
+    const sql = `
+      INSERT INTO audit_logs (action, performed_by, target_id, details, created_at)
+      VALUES ($1, $2, $3, $4, NOW())
     `;
-    
-    // Convert details object to a JSON string if it exists
-    const detailsString = details ? JSON.stringify(details) : null;
 
-    await db.run(query, [action, performedBy, targetId, detailsString]);
-    console.log(`[AUDIT] Action logged: ${action} by User ${performedBy}`);
+    await db.query(sql, [
+      action,
+      performedBy,
+      targetId,
+      details ? JSON.stringify(details) : null
+    ]);
+
+    console.log(`[AUDIT] ${action} logged by user ${performedBy}`);
   } catch (err) {
-    console.error('[AUDIT ERROR] Failed to log action:', err);
-    // We do not throw the error because auditing failing shouldn't crash the main app flow
+    console.error('[AUDIT ERROR] Failed to record audit:', err.message);
   }
 };

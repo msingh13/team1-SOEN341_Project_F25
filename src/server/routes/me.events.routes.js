@@ -23,7 +23,7 @@ router.get('/', authenticateToken, async (req, res) => {
        LEFT JOIN (
          SELECT event_id, COUNT(*)::int AS cnt
            FROM tickets
-          WHERE status IN ('claimed','checked-in')
+          WHERE status IN ('claimed','checked_in')
           GROUP BY event_id
        ) issued ON issued.event_id = e.id
       WHERE e.org_id = ANY($1::int[])

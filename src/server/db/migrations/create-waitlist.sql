@@ -1,24 +1,19 @@
-CREATE TABLE IF NOT EXISTS event_settings (
-  event_id INT PRIMARY KEY REFERENCES events(id),
-  is_waitlist_enabled BOOLEAN DEFAULT FALSE,
-  waitlist_capacity INT,
-  auto_offer_enabled BOOLEAN DEFAULT FALSE,
-  offer_duration_hours INT
+-- WAITLIST SETTINGS (matches backend: events.waitlist.routes.js)
+CREATE TABLE IF NOT EXISTS event_waitlist_settings (
+  event_id           INT PRIMARY KEY REFERENCES events(id) ON DELETE CASCADE,
+  enabled            BOOLEAN NOT NULL DEFAULT FALSE,
+  offer_window       INT CHECK (offer_window > 0),
+  queue_cap          INT CHECK (queue_cap >= 0),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS waitlist_entries (
-  id SERIAL PRIMARY KEY,
-  event_id INT NOT NULL REFERENCES events(id),
-  user_id INT NOT NULL REFERENCES users(id),
-  status VARCHAR(20) NOT NULL CHECK (status IN ('queued', 'offered', 'expired', 'removed', 'converted')),
-  joined_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+-- BASIC WAITLIST TABLE (matches backend)
+CREATE TABLE IF NOT EXISTS event_waitlist (
+  user_id    INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  event_id   INT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  joined_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, event_id)
 );
 
-CREATE INDEX IF NOT EXISTS ix_waitlist_event ON waitlist_entries(event_id);
-CREATE INDEX IF NOT EXISTS ix_waitlist_status ON waitlist_entries(status);
-CREATE INDEX IF NOT EXISTS ix_waitlist_joined ON waitlist_entries(joined_at);
-
-CREATE UNIQUE INDEX IF NOT EXISTS ux_waitlist_active 
-ON waitlist_entries(event_id, user_id) 
-WHERE status IN ('queued', 'offered');
+CREATE INDEX IF NOT EXISTS idx_event_waitlist_event_joined
+  ON event_waitlist(event_id, joined_at);

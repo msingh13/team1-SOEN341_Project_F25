@@ -1,240 +1,128 @@
 // src/server/routes/events.tickets.js
 const express = require("express");
+const crypto = require("crypto");
 const router = express.Router();
 
 const pool = require("../db");
-const { authenticateToken } = require("../middleware/auth"); // only this is required
+const { authenticateToken, requireRoles } = require("../middleware/auth");
 
-// --- local guard: organizer or admin required ---
-function requireOrganizerOrAdmin(req, res, next) {
-  // assuming your auth middleware sets req.user = { id, role, ... }
-  const role = req.user?.role;
-  if (role === "organizer" || role === "admin") return next();
-  return res
-    .status(403)
-    .json({ code: "FORBIDDEN", message: "Organizer or admin required" });
+/**
+ * POST /events/:id/claim
+ * Requires: JWT auth, role = student (or organizer/admin for testing)
+ * Returns: { ok, ticket_id, token, event_title, event_start, location, status }
+ */
+
+// helper: get event + simple capacity info
+async function getEventWithUsage(eventId) {
+  const evRes = await pool.query(
+    `SELECT id, title, start_at, location, capacity, status
+       FROM events
+      WHERE id = $1`,
+    [eventId]
+  );
+  if (!evRes.rowCount) return null;
+
+  const event = evRes.rows[0];
+
+  const capRes = await pool.query(
+    `SELECT COUNT(*)::int AS issued
+       FROM tickets
+      WHERE event_id = $1`,
+    [eventId]
+  );
+
+  const issued = capRes.rows[0]?.issued ?? 0;
+  return { event, issued };
 }
 
-function sendError(res, status, code, message, details) {
-  const body = { code, message };
-  if (details) body.details = details;
-  return res.status(status).json(body);
-}
-
-/**
- * POST /events/:id/tickets
- * Claim ticket (issued = claimed OR checked_in).
- */
-router.post("/events/:id/tickets", authenticateToken, async (req, res) => {
-  const userId = req.user?.id;
-  const eventId = Number(req.params.id);
-  if (!Number.isFinite(eventId)) {
-    return sendError(res, 400, "BAD_REQUEST", "Invalid event id");
-  }
-
-  try {
-    const { rows: evRows } = await pool.query(
-      `
-      SELECT e.id, e.capacity,
-             COALESCE((
-               SELECT COUNT(*)::int
-               FROM tickets t
-               WHERE t.event_id = e.id
-                 AND t.status IN ('claimed','checked_in')
-             ), 0) AS issued
-        FROM events e
-       WHERE e.id = $1
-         AND e.status = 'published'
-      `,
-      [eventId]
-    );
-    const ev = evRows[0];
-    if (!ev) return sendError(res, 404, "NOT_FOUND", "Event not found or unpublished");
-    if (ev.issued >= ev.capacity) return sendError(res, 400, "SOLD_OUT", "Tickets sold out");
-
-    const { rows: existing } = await pool.query(
-      `SELECT id FROM tickets WHERE event_id = $1 AND user_id = $2`,
-      [eventId, userId]
-    );
-    if (existing.length) return sendError(res, 400, "ALREADY_CLAIMED", "You already claimed a ticket");
-
-    const qr = `${eventId}.${userId}.${Date.now()}.${Math.random().toString(36).slice(2, 10)}`;
-
-    const { rows: ins } = await pool.query(
-      `INSERT INTO tickets (event_id, user_id, qr_token, status, issued_at)
-       VALUES ($1, $2, $3, 'claimed', NOW())
-       RETURNING id, event_id, qr_token, issued_at`,
-      [eventId, userId, qr]
-    );
-
-    return res.json({
-      ticketId: ins[0].id,
-      eventId: ins[0].event_id,
-      qrToken: ins[0].qr_token,
-      issued_at: ins[0].issued_at,
-    });
-  } catch (err) {
-    console.error("POST /events/:id/tickets error:", err);
-    return sendError(res, 500, "INTERNAL_ERROR", "Failed to claim ticket");
-  }
-});
-
-/**
- * GET /me/tickets
- * Returns current user's tickets (shape compatible with MyTickets.tsx).
- */
-router.get("/me/tickets", authenticateToken, async (req, res) => {
-  const userId = req.user?.id;
-  try {
-    const { rows } = await pool.query(
-      `
-      SELECT
-        t.id,
-        t.status,
-        t.qr_token    AS "qrCode",
-        t.issued_at   AS "issuedAt",
-        t.checked_in_at AS "checkedInAt",
-        e.id          AS "eventId",
-        e.title       AS "eventTitle",
-        e.location    AS "eventLocation",
-        e.start_at    AS "eventStartAt",
-        e.end_at      AS "eventEndAt"
-      FROM tickets t
-      JOIN events  e ON e.id = t.event_id
-      WHERE t.user_id = $1
-      ORDER BY t.issued_at DESC NULLS LAST, t.id DESC
-      `,
-      [userId]
-    );
-
-    const Tickets = rows.map((r) => ({
-      id: r.id,
-      status: r.status,
-      qrCode: r.qrCode,
-      issuedAt: r.issuedAt,
-      checkedInAt: r.checkedInAt,
-      ev: { title: r.eventTitle },
-      event: { startAt: r.eventStartAt, endAt: r.eventEndAt, location: r.eventLocation },
-    }));
-
-    return res.json({ Tickets });
-  } catch (err) {
-    console.error("GET /me/tickets error:", err);
-    return sendError(res, 500, "INTERNAL_ERROR", "Failed to load tickets");
-  }
-});
-
-/**
- * POST /org/tickets/validate
- * { token } → checks QR, sets checked_in
- */
 router.post(
-  "/org/tickets/validate",
+  "/events/:id/claim",
   authenticateToken,
-  requireOrganizerOrAdmin,
+  requireRoles(["student", "organizer", "admin"]), // mainly student, others allowed for testing
   async (req, res) => {
-    const { token } = req.body || {};
-    if (!token || typeof token !== "string") {
-      return sendError(res, 400, "BAD_REQUEST", "Missing QR token");
+    const userId = req.user.id;
+    const eventId = Number(req.params.id);
+
+    if (!Number.isFinite(eventId)) {
+      return res
+        .status(400)
+        .json({ code: "BAD_REQUEST", message: "Invalid event id" });
     }
 
     try {
-      const { rows } = await pool.query(
-        `SELECT id, status, event_id, user_id, checked_in_at FROM tickets WHERE qr_token = $1`,
-        [token]
+      // 1) Check if ticket already exists for this user + event
+      const existing = await pool.query(
+        `SELECT id, status, issued_at, checked_in_at, qr_token
+           FROM tickets
+          WHERE user_id = $1 AND event_id = $2
+          LIMIT 1`,
+        [userId, eventId]
       );
-      const t = rows[0];
-      if (!t) return sendError(res, 400, "INVALID", "Invalid QR");
 
-      if (t.status === "checked_in" || t.checked_in_at) {
-        return res.json({
+      if (existing.rowCount) {
+        return res.status(400).json({
           ok: false,
-          status: "duplicate",
-          message: "Already checked in",
-          ticket: { id: t.id, eventId: t.event_id },
+          code: "ALREADY_CLAIMED",
+          message: "You already claimed a ticket for this event.",
         });
       }
 
-      const { rows: up } = await pool.query(
-        `UPDATE tickets
-            SET status = 'checked_in', checked_in_at = NOW()
-          WHERE id = $1
-        RETURNING id, event_id, user_id, checked_in_at`,
-        [t.id]
-      );
-      const checked = up[0];
+      // 2) Load event & capacity usage
+      const info = await getEventWithUsage(eventId);
+      if (!info) {
+        return res
+          .status(404)
+          .json({ ok: false, code: "NOT_FOUND", message: "Event not found" });
+      }
 
-      const { rows: userRows } = await pool.query(
-        `SELECT id, name, email FROM users WHERE id = $1`,
-        [checked.user_id]
-      );
-      const attendee = userRows[0] || { id: checked.user_id };
+      const { event, issued } = info;
 
-      return res.json({
-        ok: true,
-        status: "valid",
-        attendee,
-        ticket: { id: checked.id, eventId: checked.event_id, checkedInAt: checked.checked_in_at },
-      });
-    } catch (err) {
-      console.error("POST /org/tickets/validate error:", err);
-      return sendError(res, 500, "INTERNAL_ERROR", "Server error");
-    }
-  }
-);
-
-// Alias so the client path /tickets/validate works too
-router.post(
-  "/tickets/validate",
-  authenticateToken,
-  requireOrganizerOrAdmin,
-  async (req, res) => {
-    const { token } = req.body || {};
-    if (!token || typeof token !== "string") {
-      return res.status(400).json({ code: "BAD_REQUEST", message: "Missing QR token" });
-    }
-
-    try {
-      const { rows } = await pool.query(
-        `SELECT id, status, event_id, user_id, checked_in_at FROM tickets WHERE qr_token = $1`,
-        [token]
-      );
-      const t = rows[0];
-      if (!t) return res.status(400).json({ code: "INVALID", message: "Invalid QR" });
-
-      if (t.status === "checked_in" || t.checked_in_at) {
-        return res.json({
+      // Optional: only allow published events
+      if (event.status && event.status !== "published") {
+        return res.status(400).json({
           ok: false,
-          status: "duplicate",
-          message: "Already checked in",
-          ticket: { id: t.id, eventId: t.event_id },
+          code: "INVALID_STATUS",
+          message: "Event is not open for ticket claiming.",
         });
       }
 
-      const { rows: up } = await pool.query(
-        `UPDATE tickets
-            SET status = 'checked_in', checked_in_at = NOW()
-          WHERE id = $1
-        RETURNING id, event_id, user_id, checked_in_at`,
-        [t.id]
-      );
-      const checked = up[0];
+      // 3) Capacity check (simple: issued >= capacity)
+      if (event.capacity != null && issued >= Number(event.capacity)) {
+        return res.status(400).json({
+          ok: false,
+          code: "SOLD_OUT",
+          message: "This event is sold out.",
+        });
+      }
 
-      const { rows: userRows } = await pool.query(
-        `SELECT id, name, email FROM users WHERE id = $1`,
-        [checked.user_id]
+      // 4) Create ticket
+      const token = crypto.randomBytes(16).toString("hex");
+
+      const tRes = await pool.query(
+        `INSERT INTO tickets (user_id, event_id, qr_token, status, issued_at)
+         VALUES ($1, $2, $3, 'claimed', NOW())
+         RETURNING id, qr_token, status, issued_at`,
+        [userId, eventId, token]
       );
-      const attendee = userRows[0] || { id: checked.user_id };
+
+      const ticket = tRes.rows[0];
 
       return res.json({
         ok: true,
-        status: "valid",
-        attendee,
-        ticket: { id: checked.id, eventId: checked.event_id, checkedInAt: checked.checked_in_at },
+        ticket_id: ticket.id,
+        token: ticket.qr_token,
+        event_title: event.title,
+        event_start: event.start_at,
+        location: event.location,
+        status: ticket.status || "claimed",
       });
     } catch (err) {
-      console.error("POST /tickets/validate error:", err);
-      return res.status(500).json({ code: "INTERNAL_ERROR", message: "Server error" });
+      console.error("claim ticket error", err);
+      return res.status(500).json({
+        ok: false,
+        code: "INTERNAL_ERROR",
+        message: "Server error while claiming ticket.",
+      });
     }
   }
 );

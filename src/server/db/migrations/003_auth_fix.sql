@@ -2,20 +2,9 @@ BEGIN;
 
 -- Ensure users table has the columns your code expects
 ALTER TABLE IF EXISTS users
-  ADD COLUMN IF NOT EXISTS password_hash TEXT,
+  ADD COLUMN IF NOT EXISTS password_hash TEXT NOT NULL DEFAULT '',
   ADD COLUMN IF NOT EXISTS approved BOOLEAN NOT NULL DEFAULT TRUE,
   ADD COLUMN IF NOT EXISTS student_id TEXT;
-
--- Enforce NOT NULL on password_hash
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_name='users' AND column_name='password_hash' AND is_nullable='YES'
-  ) THEN
-    EXECUTE 'ALTER TABLE users ALTER COLUMN password_hash SET NOT NULL';
-  END IF;
-END$$;
 
 -- Make users.id auto-increment (identity) if it isn't already
 DO $$
@@ -31,13 +20,15 @@ BEGIN
   END IF;
 END$$;
 
--- Create organizer_requests table used by /auth/request-organizer
+-- Create organizer_requests table used by /auth/request-organizer and admin approvals
 CREATE TABLE IF NOT EXISTS organizer_requests (
   id         SERIAL PRIMARY KEY,
   user_id    INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   org_name   TEXT NOT NULL,
-  status     TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
+  status     TEXT NOT NULL DEFAULT 'pending'
+             CHECK (status IN ('pending','approved','rejected')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  reviewed_at TIMESTAMPTZ,
   UNIQUE (user_id, org_name)
 );
 
