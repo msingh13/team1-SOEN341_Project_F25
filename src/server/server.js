@@ -21,8 +21,10 @@ const authRoutes = require("./routes/auth.routes");
 const adminOrgsRouter = require("./routes/admin.orgs.routes");
 const adminAnalyticsRouter = require("./routes/admin.analytics.routes");
 
-// ✅ TON WAITLIST ENDPOINT (correct)
+
 const waitlistRoutes = require("./routes/events.waitlist.routes");
+const orgWaitlistRoutes = require("./routes/org.waitlist.routes");
+
 const adminWaitlistRoutes = require("./routes/admin.waitlist.routes");
 
 const eventSettingsRouter = require("./routes/events.settings.routes");
@@ -55,11 +57,13 @@ app.use("/auth", authRoutes);
 
 // Saves, events, tickets, my tickets, org events
 app.use("/", savesRouter);
-app.use("/events", eventsRouter);
 
-// ✅ ICI → le waitlist router DOIT être sur `/events/...`
+
+app.use("/events", eventsRouter);
 app.use("/events", waitlistRoutes);
+app.use("/events", orgWaitlistRoutes);
 app.use("/events", eventSettingsRouter);  
+
 
 app.use("/", ticketClaimRoutes);
 app.use("/", ticketRoute);
