@@ -1,5 +1,6 @@
 // src/pages/admin/AdminHome.tsx
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
 type ByDay = { day: string; issued: number };
 type Stats = {
@@ -7,11 +8,11 @@ type Stats = {
   total_tickets: number;
   total_users: number;
   issued_today: number;
-  participation_rate: number; // %
+  participation_rate: number; 
   by_day: ByDay[];
 };
 
-const API = (import.meta as any).env?.VITE_API_URL || "http://localhost:4000";
+const API = import.meta.env.VITE_API_URL || "http://localhost:4000";
 
 export default function AdminHome() {
   const [stats, setStats] = useState<Stats | null>(null);
@@ -21,17 +22,12 @@ export default function AdminHome() {
   useEffect(() => {
     let cancel = false;
     (async () => {
-      setLoading(true);
-      setErr(null);
       try {
         const token = localStorage.getItem("token") || "";
         const res = await fetch(`${API}/admin/stats`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (!res.ok) {
-          const txt = await res.text().catch(() => "");
-          throw new Error(txt || `HTTP ${res.status}`);
-        }
+        if (!res.ok) throw new Error(await res.text());
         const data: Stats = await res.json();
         if (!cancel) setStats(data);
       } catch (e: any) {
@@ -60,13 +56,13 @@ export default function AdminHome() {
           <p className="muted">Platform-wide overview at a glance.</p>
         </div>
         <nav style={{ display: "flex", gap: 8 }}>
-          <a className="btn btn-ghost" href="/admin/moderation">Moderation</a>
-          <a className="btn btn-ghost" href="/admin/organizers">Organizer Approvals</a>
-          <a className="btn btn-ghost" href="/admin/orgs">Organizations</a>
+          <Link className="btn btn-ghost" to="/admin/moderation">Moderation</Link>
+          <Link className="btn btn-ghost" to="/admin/organizers">Organizer Approvals</Link>
+          <Link className="btn btn-ghost" to="/admin/orgs">Organizations</Link>
+          <Link className="btn btn-ghost" to="/admin/waitlist-policy">Waitlist Policy</Link>
         </nav>
       </header>
 
-      {/* KPI cards */}
       <section style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 12, marginBottom: 16 }}>
         <KPI label="Total Events" value={stats.total_events} />
         <KPI label="Total Tickets" value={stats.total_tickets} />
@@ -75,13 +71,12 @@ export default function AdminHome() {
         <KPI label="Participation Rate" value={`${stats.participation_rate}%`} />
       </section>
 
-      {/* By-day mini chart */}
       <section className="card" style={{ padding: 16 }}>
         <h3 className="h3" style={{ marginBottom: 8 }}>Tickets Issued by Day</h3>
         {stats.by_day.length === 0 ? (
           <p className="muted">No issuance yet.</p>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
+          <div style={{ display: "grid", gap: 8 }}>
             {stats.by_day.map((d) => (
               <div key={d.day}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
@@ -93,7 +88,7 @@ export default function AdminHome() {
                     style={{
                       height: 8,
                       width: `${Math.round((d.issued / maxIssued) * 100)}%`,
-                      background: "#3b82f6",
+                      background: "#7c3aed",
                       borderRadius: 4,
                     }}
                   />

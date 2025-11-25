@@ -4,139 +4,166 @@ import type { WaitlistPolicy } from "../lib/adminWaitlistPolicy.api";
 
 interface WaitlistPolicyFormProps {
   initialPolicy: WaitlistPolicy | null;
+  submitting?: boolean;
   onSubmit: (data: {
     maxSize: number | null;
     autoPromote: boolean;
     enabled: boolean;
   }) => Promise<void> | void;
-  submitting?: boolean;
+
+  /** 🔥 optional shared style injection */
+  inputStyle?: React.CSSProperties;
 }
 
 const WaitlistPolicyForm: React.FC<WaitlistPolicyFormProps> = ({
   initialPolicy,
   onSubmit,
   submitting = false,
+  inputStyle,
 }) => {
-  const [maxSizeInput, setMaxSizeInput] = useState<string>(
-    initialPolicy?.maxSize != null ? String(initialPolicy.maxSize) : ""
+  const mergedInput = {
+    width: "100%",
+    padding: "10px 12px",
+    borderRadius: 8,
+    border: "1px solid #2f2f2f",
+    background: "#151515",
+    color: "white",
+    fontSize: 14,
+    ...inputStyle,
+  };
+
+  const [maxSizeInput, setMaxSizeInput] = useState(
+    initialPolicy?.maxSize ? String(initialPolicy.maxSize) : ""
   );
-  const [autoPromote, setAutoPromote] = useState<boolean>(
+  const [autoPromote, setAutoPromote] = useState(
     initialPolicy?.autoPromote ?? false
   );
-  const [enabled, setEnabled] = useState<boolean>(
-    initialPolicy?.enabled ?? true
-  );
+  const [enabled, setEnabled] = useState(initialPolicy?.enabled ?? true);
+
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const handleSubmit = async (e: FormEvent) => {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setSuccess(null);
 
     let maxSize: number | null = null;
-    if (maxSizeInput.trim() !== "") {
-      const parsed = Number(maxSizeInput);
-      if (!Number.isFinite(parsed) || parsed <= 0) {
-        setError("Max waitlist size must be a positive number or left blank.");
-        return;
+
+    if (maxSizeInput.trim()) {
+      const num = Number(maxSizeInput);
+      if (!Number.isFinite(num) || num <= 0) {
+        return setError("Max size must be positive or blank.");
       }
-      maxSize = parsed;
+      maxSize = num;
     }
 
-    try {
-      await onSubmit({
-        maxSize,
-        autoPromote,
-        enabled,
-      });
-      setSuccess("Waitlist policy updated successfully.");
-    } catch (err) {
-      console.error("Failed to update policy", err);
-      setError("Failed to update waitlist policy. Please try again.");
-    }
-  };
+    await onSubmit({ maxSize, autoPromote, enabled });
+    setSuccess("Policy updated.");
+  }
 
   return (
     <form
       onSubmit={handleSubmit}
-      className="space-y-4 rounded-lg border border-slate-700 bg-[#121212] p-4"
+      style={{
+        background: "#121212",
+        border: "1px solid #2b2b2b",
+        borderRadius: 10,
+        padding: 20,
+      }}
     >
-      <h2 className="text-lg font-semibold">Waitlist Policy</h2>
-      <p className="text-xs text-slate-400">
-        Configure global defaults for how event waitlists behave across the
-        platform.
+      <h2 style={{ fontSize: 18, marginBottom: 4 }}>Waitlist Policy</h2>
+      <p style={{ fontSize: 12, color: "#9ca3af", marginBottom: 12 }}>
+        Configure global defaults for waitlist behavior.
       </p>
 
       {error && (
-        <div className="rounded-md border border-red-500 bg-red-950 px-3 py-2 text-xs text-red-200">
+        <div
+          style={{
+            background: "#3b0d0d",
+            border: "1px solid #b12d2d",
+            padding: "8px 12px",
+            borderRadius: 6,
+            fontSize: 12,
+            color: "#fca5a5",
+            marginBottom: 10,
+          }}
+        >
           {error}
         </div>
       )}
 
       {success && (
-        <div className="rounded-md border border-emerald-500 bg-emerald-950 px-3 py-2 text-xs text-emerald-200">
+        <div
+          style={{
+            background: "#062a17",
+            border: "1px solid #0f8a47",
+            padding: "8px 12px",
+            borderRadius: 6,
+            fontSize: 12,
+            color: "#bbf7d0",
+            marginBottom: 10,
+          }}
+        >
           {success}
         </div>
       )}
 
-      <div className="space-y-1">
-        <label className="text-sm font-medium">
-          Max waitlist size (blank = unlimited)
-        </label>
+      {/* Max size */}
+      <div style={{ marginBottom: 12 }}>
+        <label style={{ fontSize: 14 }}>Max waitlist size</label>
         <input
           type="number"
-          min={1}
-          inputMode="numeric"
           value={maxSizeInput}
           onChange={(e) => setMaxSizeInput(e.target.value)}
-          className="w-full rounded-md border border-slate-600 bg-black px-3 py-2 text-sm outline-none focus:border-sky-500"
-          placeholder="e.g. 100"
+          placeholder="blank = unlimited"
+          style={mergedInput}
         />
       </div>
 
-      <div className="flex items-center gap-2">
+      {/* Auto promote */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
         <input
-          id="autoPromote"
           type="checkbox"
           checked={autoPromote}
           onChange={(e) => setAutoPromote(e.target.checked)}
-          className="h-4 w-4 rounded border-slate-600 bg-black"
         />
-        <label htmlFor="autoPromote" className="text-sm">
-          Automatically promote attendees from waitlist when seats open
+        <label style={{ fontSize: 14 }}>
+          Automatically promote when space opens
         </label>
       </div>
 
-      <div className="flex items-center gap-2">
+      {/* Enabled */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
         <input
-          id="enabled"
           type="checkbox"
           checked={enabled}
           onChange={(e) => setEnabled(e.target.checked)}
-          className="h-4 w-4 rounded border-slate-600 bg-black"
         />
-        <label htmlFor="enabled" className="text-sm">
-          Waitlist enabled globally
-        </label>
+        <label style={{ fontSize: 14 }}>Enable waitlists globally</label>
       </div>
 
       {initialPolicy?.updatedAt && (
-        <p className="text-[11px] text-slate-500">
-          Last updated:{" "}
-          {new Date(initialPolicy.updatedAt).toLocaleString() || "—"}
+        <p style={{ fontSize: 11, color: "#7f7f7f", marginBottom: 10 }}>
+          Last updated: {new Date(initialPolicy.updatedAt).toLocaleString()}
         </p>
       )}
 
-      <div className="flex justify-end gap-2 pt-2">
-        <button
-          type="submit"
-          disabled={submitting}
-          className="rounded-md border border-sky-500 px-4 py-2 text-sm font-medium text-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {submitting ? "Saving..." : "Save Policy"}
-        </button>
-      </div>
+      <button
+        type="submit"
+        disabled={submitting}
+        style={{
+          padding: "8px 16px",
+          borderRadius: 6,
+          background: "#2563eb",
+          border: "none",
+          color: "white",
+          cursor: "pointer",
+          opacity: submitting ? 0.6 : 1,
+        }}
+      >
+        {submitting ? "Saving…" : "Save Policy"}
+      </button>
     </form>
   );
 };

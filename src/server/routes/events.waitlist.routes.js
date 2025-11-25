@@ -13,21 +13,6 @@ function sendError(res, status, code, message, details) {
 }
 
 /**
- * Waitlist table (to be created via migration):
- *
- * CREATE TABLE IF NOT EXISTS event_waitlist (
- *   user_id   INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
- *   event_id  INT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
- *   joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
- *   PRIMARY KEY (user_id, event_id)
- * );
- *
- * Index suggestion:
- *   CREATE INDEX IF NOT EXISTS ix_event_waitlist_event_joined
- *     ON event_waitlist (event_id, joined_at);
- */
-
-/**
  * Helper: fetch event + issued count and enforce "sold-out only"
  * Returns event row if sold out, otherwise sends an error and returns null.
  */
@@ -67,7 +52,7 @@ async function requireSoldOutEvent(eventId, res) {
  * - Returns 201 with current position
  */
 router.post(
-  "/events/:id/waitlist/join",
+  "/:id/waitlist/join",
   authenticateToken,
   requireApproved,
   async (req, res) => {
@@ -88,7 +73,12 @@ router.post(
         [eventId, userId]
       );
       if (existing.length) {
-        return sendError(res, 403, "ALREADY_IN_WAITLIST", "You are already in the waitlist for this event");
+        return sendError(
+          res,
+          403,
+          "ALREADY_IN_WAITLIST",
+          "You are already in the waitlist for this event"
+        );
       }
 
       // Insert into waitlist
@@ -101,17 +91,16 @@ router.post(
       const joinedAt = insertedRows[0].joined_at;
 
       // Compute position (1-based) at the time of join
-        const { rows: posRows } = await pool.query(
+      const { rows: posRows } = await pool.query(
         `
         SELECT COUNT(*)::int AS before_me
-            FROM event_waitlist
-        WHERE event_id = $1
-            AND joined_at < $2
+          FROM event_waitlist
+         WHERE event_id = $1
+           AND joined_at < $2
         `,
         [eventId, joinedAt]
-        );
-        const position = posRows[0].before_me + 1;
-
+      );
+      const position = posRows[0].before_me + 1;
 
       return res.status(201).json({
         state: "waiting",
@@ -131,7 +120,7 @@ router.post(
  * - Always returns 204 (no content)
  */
 router.delete(
-  "/events/:id/waitlist/leave",
+  "/:id/waitlist/leave",
   authenticateToken,
   requireApproved,
   async (req, res) => {
@@ -166,7 +155,7 @@ router.delete(
  * - Returns { state: "not_joined" | "waiting", position: number | null }
  */
 router.get(
-  "/events/:id/waitlist/status",
+  "/:id/waitlist/status",
   authenticateToken,
   requireApproved,
   async (req, res) => {
@@ -195,17 +184,16 @@ router.get(
 
       const joinedAt = entry.joined_at;
 
-        const { rows: posRows } = await pool.query(
+      const { rows: posRows } = await pool.query(
         `
         SELECT COUNT(*)::int AS before_me
-            FROM event_waitlist
-        WHERE event_id = $1
-            AND joined_at < $2
+          FROM event_waitlist
+         WHERE event_id = $1
+           AND joined_at < $2
         `,
         [eventId, joinedAt]
-        );
-        const position = posRows[0].before_me + 1;
-
+      );
+      const position = posRows[0].before_me + 1;
 
       return res.json({
         state: "waiting",

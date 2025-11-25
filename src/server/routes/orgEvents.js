@@ -141,10 +141,12 @@ router.post('/', authenticateToken, async (req, res) => {
     waitlist_queue_cap,
   } = req.body || {};
 
-  if (!title || !start_at || !location || !capacity) {
+  if (!title || !start_at || !location || capacity == null) {
     return sendError(res, 400, 'BAD_REQUEST', 'Missing required fields');
   }
-  if (!Number.isFinite(Number(capacity)) || Number(capacity) <= 0) {
+
+  const capacityNum = Number(capacity);
+  if (!Number.isFinite(capacityNum) || capacityNum <= 0) {
     return sendError(res, 400, 'BAD_REQUEST', 'Capacity must be a positive integer');
   }
 
@@ -208,7 +210,7 @@ router.post('/', authenticateToken, async (req, res) => {
         start_at,
         end_at || null,
         location,
-        Number(capacity),
+        capacityNum,
         ticket_type,
         wlEnabled,
         wlWindow,
@@ -276,6 +278,21 @@ router.put('/:id', authenticateToken, async (req, res) => {
     }
   }
 
+  const hasCapacityChange = capacity !== undefined && capacity !== null;
+  let capacityNum = null;
+
+  if (hasCapacityChange) {
+    capacityNum = Number(capacity);
+    if (!Number.isFinite(capacityNum) || capacityNum <= 0) {
+      return sendError(
+        res,
+        400,
+        "BAD_REQUEST",
+        "Capacity must be a positive integer"
+      );
+    }
+  }
+
   try {
     // Ownership + time check
     const { rows: own } = await pool.query(
@@ -290,6 +307,28 @@ router.put('/:id', authenticateToken, async (req, res) => {
     }
     if (own[0].start_at && new Date(own[0].start_at) <= new Date()) {
       return sendError(res, 400, "EVENT_STARTED", "Cannot edit after event start");
+    }
+
+    // If capacity is being changed, ensure it's not below already issued tickets
+    if (hasCapacityChange) {
+      const { rows: usedRows } = await pool.query(
+        `
+        SELECT COALESCE(COUNT(*),0)::int AS used
+        FROM tickets
+        WHERE event_id = $1
+          AND status IN ('claimed','checked_in')
+        `,
+        [eventId]
+      );
+      const used = usedRows[0]?.used ?? 0;
+      if (capacityNum < used) {
+        return sendError(
+          res,
+          409,
+          "CAPACITY_TOO_LOW",
+          `Capacity cannot be lower than already issued tickets (${used}).`
+        );
+      }
     }
 
     const { rows } = await pool.query(
@@ -320,7 +359,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
         start_at ?? null,
         end_at ?? null,
         location ?? null,
-        capacity ?? null,
+        hasCapacityChange ? capacityNum : null,
         ticket_type ?? null,
         typeof waitlist_enabled === "boolean" ? waitlist_enabled : null,
         waitlist_enabled ? Number(waitlist_offer_window ?? 0) : null,
@@ -365,7 +404,7 @@ router.get('/:id/attendees.csv', authenticateToken, async (req, res) => {
       `
       SELECT
         u.name           AS attendee_name,
-        u.student_id     AS student_id,     -- uses your column
+        u.student_id     AS student_id,
         u.email          AS email,
         t.id             AS ticket_id,
         t.status         AS ticket_status,
@@ -401,8 +440,6 @@ router.get('/:id/attendees.csv', authenticateToken, async (req, res) => {
 /* =========================================================
  *  ANALYTICS  (matches client path /api/org/events/:id/analytics)
  *  GET /:id/analytics
- *  - Ownership check (organizer must own the event)
- *  - Returns issued, checked-in, remaining, attendance rate
  * ======================================================= */
 router.get('/:id/analytics', authenticateToken, async (req, res) => {
   const userId = req.user?.id;

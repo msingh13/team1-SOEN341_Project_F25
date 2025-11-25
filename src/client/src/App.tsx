@@ -30,18 +30,28 @@ import { RoleRoute } from "./auth/guards";
 /* ---------- Layout ---------- */
 function Layout() {
   return (
-    <>
+    <div className="app-shell">
       <Header />
-      <Outlet />
+
+      {/* main content area */}
+      <main className="app-main">
+        <Outlet />
+      </main>
+
+      {/* subtle fade into footer so cards don’t look “cut off” */}
+      <div className="footer-gradient" />
+
       <footer className="footer">
         <div className="container footer-inner">
-          <span className="muted">© {new Date().getFullYear()} Campus Events — Prototype</span>
-          <a className="muted" href="https://vite.dev" target="_blank" rel="noreferrer">
-            Built with Vite + React
-          </a>
+          <span className="muted">
+            © {new Date().getFullYear()} Campus Events — Prototype
+          </span>
+          <span className="muted">
+            Built with <span className="footer-accent">Vite + React</span>
+          </span>
         </div>
       </footer>
-    </>
+    </div>
   );
 }
 
@@ -156,7 +166,6 @@ export default function App() {
               </RoleRoute>
             }
           />
-          {/* Admin home */}
           <Route
             path="/admin"
             element={

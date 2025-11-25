@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
-type User = { id: number; role: "student" | "organizer" | "admin" };
+type User = {
+  name: string; id: number; role: "student" | "organizer" | "admin" 
+};
 type AuthState = {
   user: User | null;
   token: string | null;
@@ -21,7 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
       if (payload?.id) {
-        setUser({ id: Number(payload.id), role: (payload.role ?? "student") });
+        setUser({ id: Number(payload.id), name: payload.name || "Unknown", role: (payload.role ?? "student") });
       } else {
         setUser(null);
       }

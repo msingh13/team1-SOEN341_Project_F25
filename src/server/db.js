@@ -7,14 +7,13 @@ const {
   DB_HOST,
   DB_NAME,
   DB_PORT,
-  DB_PASSWORD, // preferred name
-  DB_PASS,     // your .env currently uses this; we’ll fall back to it
+  DB_PASSWORD, // preferred
+  DB_PASS,     // fallback
   NODE_ENV,
 } = process.env;
 
 const useUrl = !!DATABASE_URL;
 
-// Allow both DATABASE_URL or discrete creds; accept DB_PASS or DB_PASSWORD
 const pool = new Pool(
   useUrl
     ? {
@@ -31,7 +30,7 @@ const pool = new Pool(
       }
 );
 
-// Optional: simple connection test on first import in dev
+// Simple connection test in non-test env
 if (NODE_ENV !== "test") {
   pool
     .query("SELECT 1")

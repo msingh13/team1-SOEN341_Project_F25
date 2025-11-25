@@ -14,7 +14,11 @@ interface WaitlistAuditTableProps {
   filters: AuditFilters;
   onFiltersChange: (next: AuditFilters) => void;
   onPageChange: (page: number) => void;
-  // for link navigation
+
+  /** 🔥 Custom injected input styles */
+  inputStyle?: React.CSSProperties;
+
+  // Link util
   buildEventLink?: (eventId: number) => string;
   buildUserLink?: (userId: number) => string;
 }
@@ -28,6 +32,7 @@ const WaitlistAuditTable: React.FC<WaitlistAuditTableProps> = ({
   filters,
   onFiltersChange,
   onPageChange,
+  inputStyle,
   buildEventLink,
   buildUserLink,
 }) => {
@@ -44,66 +49,101 @@ const WaitlistAuditTable: React.FC<WaitlistAuditTableProps> = ({
     });
   };
 
+  const mergedInput = {
+    width: "120px",
+    padding: "8px 10px",
+    borderRadius: 6,
+    border: "1px solid #2f2f2f",
+    background: "#0f0f0f",
+    color: "white",
+    fontSize: 12,
+    ...inputStyle, // override with injected styles
+  };
+
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap gap-3 rounded-lg border border-slate-700 bg-[#121212] p-3 text-xs">
-        <div className="flex flex-col gap-1">
-          <label className="text-[11px] text-slate-400">Event ID</label>
+      {/* Filters */}
+      <div
+        style={{
+          display: "flex",
+          gap: 16,
+          flexWrap: "wrap",
+          background: "#121212",
+          border: "1px solid #2d2d2d",
+          padding: 12,
+          borderRadius: 10,
+        }}
+      >
+        {/* Event ID */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <label style={{ fontSize: 11, color: "#b0b0b0" }}>Event ID</label>
           <input
             type="text"
+            style={mergedInput}
             value={filters.eventId ?? ""}
             onChange={(e) => handleFilterChange("eventId", e.target.value)}
-            className="w-32 rounded border border-slate-600 bg-black px-2 py-1 text-xs"
             placeholder="e.g. 42"
           />
         </div>
 
-        <div className="flex flex-col gap-1">
-          <label className="text-[11px] text-slate-400">Org ID</label>
+        {/* Org ID */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <label style={{ fontSize: 11, color: "#b0b0b0" }}>Org ID</label>
           <input
             type="text"
+            style={mergedInput}
             value={filters.orgId ?? ""}
             onChange={(e) => handleFilterChange("orgId", e.target.value)}
-            className="w-32 rounded border border-slate-600 bg-black px-2 py-1 text-xs"
             placeholder="e.g. 7"
           />
         </div>
 
-        <div className="flex flex-col gap-1">
-          <label className="text-[11px] text-slate-400">User ID</label>
+        {/* User ID */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <label style={{ fontSize: 11, color: "#b0b0b0" }}>User ID</label>
           <input
             type="text"
+            style={mergedInput}
             value={filters.userId ?? ""}
             onChange={(e) => handleFilterChange("userId", e.target.value)}
-            className="w-32 rounded border border-slate-600 bg-black px-2 py-1 text-xs"
             placeholder="e.g. 15"
           />
         </div>
 
-        <div className="flex flex-col gap-1">
-          <label className="text-[11px] text-slate-400">From date</label>
+        {/* From date */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <label style={{ fontSize: 11, color: "#b0b0b0" }}>From</label>
           <input
             type="date"
+            style={mergedInput}
             value={filters.from ?? ""}
             onChange={(e) => handleFilterChange("from", e.target.value)}
-            className="rounded border border-slate-600 bg-black px-2 py-1 text-xs"
           />
         </div>
 
-        <div className="flex flex-col gap-1">
-          <label className="text-[11px] text-slate-400">To date</label>
+        {/* To date */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <label style={{ fontSize: 11, color: "#b0b0b0" }}>To</label>
           <input
             type="date"
+            style={mergedInput}
             value={filters.to ?? ""}
             onChange={(e) => handleFilterChange("to", e.target.value)}
-            className="rounded border border-slate-600 bg-black px-2 py-1 text-xs"
           />
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-slate-700 bg-[#101010]">
-        <table className="min-w-full text-xs">
-          <thead className="bg-slate-900/60 text-[11px] uppercase tracking-wide text-slate-400">
+      {/* Table */}
+      <div
+        style={{
+          overflowX: "auto",
+          borderRadius: 10,
+          border: "1px solid #2b2b2b",
+          background: "#101010",
+        }}
+      >
+        <table style={{ width: "100%", fontSize: 12 }}>
+          <thead style={{ background: "#0c0c0c", color: "#9ca3af" }}>
             <tr>
               <th className="px-3 py-2 text-left">Changed At</th>
               <th className="px-3 py-2 text-left">Admin</th>
@@ -112,83 +152,62 @@ const WaitlistAuditTable: React.FC<WaitlistAuditTableProps> = ({
               <th className="px-3 py-2 text-left">Links</th>
             </tr>
           </thead>
+
           <tbody>
-            {items.length === 0 && !loading && (
+            {!loading && items.length === 0 && (
               <tr>
-                <td
-                  className="px-3 py-4 text-center text-slate-500"
-                  colSpan={5}
-                >
-                  No audit entries found for these filters.
+                <td colSpan={5} style={{ padding: 12, textAlign: "center", color: "#777" }}>
+                  No audit entries found.
                 </td>
               </tr>
             )}
 
-            {items.map((row) => {
-              const oldValue = row.oldValue || {};
-              const newValue = row.newValue || {};
+            {items.map((row) => (
+              <tr
+                key={row.id}
+                style={{ borderTop: "1px solid #1e1e1e" }}
+              >
+                <td className="px-3 py-2">{new Date(row.changedAt).toLocaleString()}</td>
+                <td className="px-3 py-2">{row.adminId ?? "—"}</td>
 
-              return (
-                <tr
-                  key={row.id}
-                  className="border-t border-slate-800 hover:bg-slate-900/60"
-                >
-                  <td className="px-3 py-2 align-top">
-                    {new Date(row.changedAt).toLocaleString()}
-                  </td>
-                  <td className="px-3 py-2 align-top">
-                    {row.adminId ?? "—"}
-                  </td>
-                  <td className="px-3 py-2 align-top">
-                    <code className="whitespace-pre-wrap text-[11px] text-slate-300">
-                      {JSON.stringify(oldValue, null, 2)}
-                    </code>
-                  </td>
-                  <td className="px-3 py-2 align-top">
-                    <code className="whitespace-pre-wrap text-[11px] text-sky-300">
-                      {JSON.stringify(newValue, null, 2)}
-                    </code>
-                  </td>
-                  <td className="px-3 py-2 align-top">
-                    <div className="flex flex-col gap-1">
-                      {row.eventId && buildEventLink ? (
-                        <a
-                          href={buildEventLink(row.eventId)}
-                          className="text-[11px] text-sky-400 hover:underline"
-                        >
-                          View event #{row.eventId}
-                        </a>
-                      ) : (
-                        <span className="text-[11px] text-slate-500">
-                          No event link
-                        </span>
-                      )}
+                <td className="px-3 py-2">
+                  <code style={{ fontSize: 11, color: "#ccc" }}>
+                    {JSON.stringify(row.oldValue || {}, null, 2)}
+                  </code>
+                </td>
 
-                      {row.userId && buildUserLink ? (
-                        <a
-                          href={buildUserLink(row.userId)}
-                          className="text-[11px] text-sky-400 hover:underline"
-                        >
-                          View user #{row.userId}
-                        </a>
-                      ) : (
-                        <span className="text-[11px] text-slate-500">
-                          No user link
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
+                <td className="px-3 py-2">
+                  <code style={{ fontSize: 11, color: "#7dd3fc" }}>
+                    {JSON.stringify(row.newValue || {}, null, 2)}
+                  </code>
+                </td>
+
+                <td className="px-3 py-2">
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {row.eventId && buildEventLink ? (
+                      <a href={buildEventLink(row.eventId)} style={{ color: "#38bdf8", fontSize: 11 }}>
+                        View event #{row.eventId}
+                      </a>
+                    ) : (
+                      <span style={{ color: "#555", fontSize: 11 }}>No event link</span>
+                    )}
+
+                    {row.userId && buildUserLink ? (
+                      <a href={buildUserLink(row.userId)} style={{ color: "#38bdf8", fontSize: 11 }}>
+                        View user #{row.userId}
+                      </a>
+                    ) : (
+                      <span style={{ color: "#555", fontSize: 11 }}>No user link</span>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
 
             {loading && (
               <tr>
-                <td
-                  colSpan={5}
-                  className="px-3 py-4 text-center text-slate-400"
-                >
-                  Loading audit entries…
+                <td colSpan={5} style={{ padding: 12, textAlign: "center", color: "#999" }}>
+                  Loading…
                 </td>
               </tr>
             )}
@@ -196,24 +215,45 @@ const WaitlistAuditTable: React.FC<WaitlistAuditTableProps> = ({
         </table>
       </div>
 
-      <div className="flex items-center justify-between text-xs text-slate-400">
+      {/* Pagination */}
+      <div
+        style={{
+          fontSize: 12,
+          color: "#aaa",
+          display: "flex",
+          justifyContent: "space-between",
+        }}
+      >
         <span>
           Page {page} of {totalPages} ({total} entries)
         </span>
-        <div className="flex items-center gap-2">
+        <div style={{ display: "flex", gap: 8 }}>
           <button
-            type="button"
-            disabled={page <= 1 || loading}
             onClick={() => onPageChange(page - 1)}
-            className="rounded-md border border-slate-600 px-3 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={loading || page <= 1}
+            style={{
+              padding: "6px 12px",
+              background: "#1a1a1a",
+              border: "1px solid #333",
+              borderRadius: 6,
+              color: "white",
+              opacity: page <= 1 ? 0.4 : 1,
+            }}
           >
             Prev
           </button>
+
           <button
-            type="button"
-            disabled={page >= totalPages || loading}
             onClick={() => onPageChange(page + 1)}
-            className="rounded-md border border-slate-600 px-3 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={loading || page >= totalPages}
+            style={{
+              padding: "6px 12px",
+              background: "#1a1a1a",
+              border: "1px solid #333",
+              borderRadius: 6,
+              color: "white",
+              opacity: page >= totalPages ? 0.4 : 1,
+            }}
           >
             Next
           </button>
