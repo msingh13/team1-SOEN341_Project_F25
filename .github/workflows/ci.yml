@@ -1,4 +1,4 @@
-name: CI (Always Pass)
+name: CI
 
 on:
   push:
@@ -7,11 +7,25 @@ on:
     branches: [ main, dev ]
 
 jobs:
-  ci-check:
+  backend-tests:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./src/server
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Run placeholder test
-        run: echo "✅ CI pipeline is working — tests will be added later"
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install deps
+        run: npm install
+
+      - name: Run unit tests (Jest)
+        run: npx jest --config jest.config.cjs
+
+      - name: Lint backend (ESLint)
+        run: npx eslint . --ext .js || true
