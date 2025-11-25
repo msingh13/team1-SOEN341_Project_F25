@@ -20,4 +20,4 @@ npx eslint . --ext .js > eslint-backend.txt
 
 # Frontend
 cd src/client
-npx eslint . --ext .tsx,.ts,.jsx,.js > eslint-frontend.txt```
+npx eslint . --ext .tsx,.ts,.jsx,.js > eslint-frontend.txt
